@@ -1,0 +1,22 @@
+[package]
+name = "thread2mqtt"
+version = "0.5.0"
+edition = "2021"
+authors = ["Ravindra JOB <https://blog.ravindra-job.fr>"]
+license = "MIT"
+description = "Zero-dependency Rust Thread & Matter-over-Thread to MQTT bridge with Zigbee2MQTT-grade Web UI, interactive mesh topology debugger, Home Assistant Auto-Discovery, and Prometheus metrics."
+homepage = "https://blog.ravindra-job.fr/iot/thread2mqtt-rust-equivalent-zigbee2mqtt-thread-matter-home-assistant/"
+repository = "https://github.com/ravindrajob/thread2mqtt"
+keywords = ["thread", "openthread", "matter", "mqtt", "home-assistant"]
+categories = ["network-programming", "embedded", "web-programming"]
+
+[dependencies]
+# Pure Rust standard library: zero external crate supply-chain surface,
+# deterministic musl static builds (< 2 MB) and minimal RAM footprint (< 10 MB).
+
+[profile.release]
+opt-level = "z"
+lto = true
+codegen-units = 1
+strip = true
+panic = "abort"

@@ -1,0 +1,58 @@
+# Prometheus Alerting Rules for Thread2MQTT v0.4
+# Validate with: promtool check rules monitoring/prometheus-alerts.yml
+groups:
+  - name: thread2mqtt_mesh_health
+    rules:
+      - alert: Thread2MQTTDown
+        expr: up{job="thread2mqtt"} == 0 or thread2mqtt_up == 0
+        for: 2m
+        labels:
+          severity: critical
+        annotations:
+          summary: "Thread2MQTT exporter unreachable"
+          description: "Thread2MQTT has been unreachable for 2 minutes. Thread/Matter telemetry is blind."
+
+      - alert: ThreadMatterNodeOffline
+        expr: thread2mqtt_node_matter_available == 0
+        for: 5m
+        labels:
+          severity: warning
+        annotations:
+          summary: "Matter-over-Thread node offline: {{ $labels.name }}"
+          description: "Node {{ $labels.name }} ({{ $labels.rloc16 }}) lost its Matter L7 CASE session for > 5m."
+
+      - alert: ThreadNodeWeakRSSI
+        expr: thread2mqtt_node_rssi_dbm{role!="leader"} <= -88
+        for: 15m
+        labels:
+          severity: warning
+        annotations:
+          summary: "Weak Thread RF signal on {{ $labels.name }} ({{ $value }} dBm)"
+          description: "Node {{ $labels.name }} ({{ $labels.rloc16 }}) has average RSSI <= -88 dBm. Add a mains-powered Thread router nearby."
+
+      - alert: ThreadNodeLowBattery
+        expr: thread2mqtt_node_battery_percent <= 15
+        for: 30m
+        labels:
+          severity: warning
+        annotations:
+          summary: "Low battery on Thread sensor {{ $labels.name }} ({{ $value }}%)"
+          description: "Replace battery soon on {{ $labels.name }} to avoid Thread child timeout."
+
+      - alert: ThreadMeshHealthDegraded
+        expr: thread2mqtt_mesh_health_score < 70
+        for: 10m
+        labels:
+          severity: warning
+        annotations:
+          summary: "Thread mesh health score degraded ({{ $value }}%)"
+          description: "Check Thread2MQTT Advisor (/api/alerts) for weak links, RF interference, or router redundancy."
+
+      - alert: ThreadMacAckDegraded
+        expr: thread2mqtt_mac_ack_rate_percent < 90
+        for: 15m
+        labels:
+          severity: warning
+        annotations:
+          summary: "802.15.4 MAC ACK rate below 90% ({{ $value }}%)"
+          description: "High 2.4 GHz RF interference or SED indirect TX drops detected on OpenThread Border Router."

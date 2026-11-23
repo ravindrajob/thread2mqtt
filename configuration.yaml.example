@@ -1,0 +1,48 @@
+# ==============================================================================
+# Thread2MQTT — configuration.yaml (style Zigbee2MQTT)
+# Copy to ./data/configuration.yaml or pass via `--config configuration.yaml`
+# Environment variables (OTBR_REST_URL, MATTER_WS_URL, MQTT_HOST, ...) override YAML.
+# ==============================================================================
+
+frontend:
+  bind: "127.0.0.1:8099"       # Use "0.0.0.0:8099" inside Docker (publish on 127.0.0.1)
+  default_theme: "dark"        # dark | light
+  # auth_token: "${THREAD2MQTT_AUTH_TOKEN}"  # Optional Bearer/Cookie token for LAN access
+  # device_images_base_url: "" # Optional community PNG base URL (empty = 100% local SVG + /data/device_images/)
+
+thread:
+  otbr_rest_url: "http://127.0.0.1:8081"
+  otctl_cmd: "ot-ctl"          # e.g. "docker exec matter-otbr ot-ctl"
+  poll_interval_secs: 15       # 5..300 seconds
+  zigbee_channel: 11           # Optional (11..26) for 2.4 GHz coexistence analysis
+
+matter:
+  ws_url: "ws://127.0.0.1:5580/ws"
+  # Security-by-design: keep false until you want to join/commission devices from the Web UI.
+  # Both `advanced.read_only_mode: false` AND `matter.allow_commissioning: true` are required.
+  allow_commissioning: false
+  allow_interview: true        # Re-interview Matter clusters/attributes (requires read_only_mode: false)
+  allow_ota_check: true        # Read-only CSA DCL firmware update check (safe even in read_only_mode)
+
+mqtt:
+  enabled: false               # Set true to publish states & Home Assistant Auto-Discovery
+  server: "127.0.0.1:1883"
+  user: "${MQTT_USER}"
+  password: "${MQTT_PASS}"
+  base_topic: "thread2mqtt"
+  homeassistant_discovery: true
+  discovery_prefix: "homeassistant"
+
+advanced:
+  read_only_mode: true         # Master safety lock (true = zero mutations on live production)
+  demo_mode: false             # Set true for zero-hardware 6-node synthetic sandbox
+  data_dir: "/data"            # Persists friendly names, groups & notes (state.json)
+  rssi_history_points: 60      # In-memory RSSI sparkline points per node
+
+# Optional static friendly names, rooms & device photos (just like Zigbee2MQTT devices:)
+devices:
+  # "020000000000000c":
+  #   friendly_name: "Hallway Smoke Detector"
+  #   group: "Safety"
+  #   description: "Upper floor hallway ceiling"
+  #   icon: "device_images/heiman_smoke.png"   # Local file under <data_dir>/device_images/ or https:// URL

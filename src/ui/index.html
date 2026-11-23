@@ -1,0 +1,2307 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
+<title>Thread2MQTT v0.5 — Thread &amp; Matter Dashboard</title>
+<style>
+  :root {
+    --bg: #0f141c;
+    --sidebar: #141b26;
+    --surface: #18212f;
+    --surface-2: #1e293b;
+    --surface-hover: #243247;
+    --border: #2a374b;
+    --border-soft: rgba(148, 163, 184, 0.13);
+    --text: #e6edf6;
+    --text-2: #9fb1c9;
+    --muted: #788ba4;
+    --primary: #1d9bf0;
+    --primary-bg: rgba(29, 155, 240, 0.14);
+    --green: #22c55e;
+    --green-bg: rgba(34, 197, 94, 0.14);
+    --amber: #f59e0b;
+    --amber-bg: rgba(245, 158, 11, 0.15);
+    --red: #ef4444;
+    --red-bg: rgba(239, 68, 68, 0.15);
+    --purple: #a78bfa;
+    --purple-bg: rgba(167, 139, 250, 0.15);
+    --term: #090e16;
+    --shadow: 0 2px 10px rgba(0, 0, 0, 0.25);
+    --sb-w: 232px;
+    --r: 10px;
+  }
+  body.light {
+    --bg: #f3f6fa;
+    --sidebar: #ffffff;
+    --surface: #ffffff;
+    --surface-2: #f8fafc;
+    --surface-hover: #edf4fc;
+    --border: #d9e2ee;
+    --border-soft: rgba(15, 23, 42, 0.08);
+    --text: #142033;
+    --text-2: #475569;
+    --muted: #64748b;
+    --primary: #0284c7;
+    --primary-bg: rgba(2, 132, 199, 0.1);
+    --green: #16a34a;
+    --green-bg: rgba(22, 163, 74, 0.12);
+    --amber: #d97706;
+    --amber-bg: rgba(217, 119, 6, 0.12);
+    --red: #dc2626;
+    --red-bg: rgba(220, 38, 38, 0.12);
+    --purple: #7c3aed;
+    --purple-bg: rgba(124, 58, 237, 0.12);
+    --term: #0f172a;
+    --shadow: 0 1px 6px rgba(15, 23, 42, 0.06);
+  }
+  body.sb-mini { --sb-w: 66px; }
+  body:not(.adv-mode) .adv-only { display: none !important; }
+  .qr-box { margin-top: 10px; border: 1px solid var(--border); border-radius: 10px; overflow: hidden; background: #000; position: relative; }
+  .qr-box video { width: 100%; max-height: 230px; object-fit: cover; display: block; }
+  .hw-box { background: var(--surface-2); border: 1px solid var(--border); border-radius: 9px; padding: 11px 13px; margin-bottom: 12px; }
+  .hw-chips { display: flex; flex-wrap: wrap; gap: 6px; margin-top: 8px; }
+
+  * { box-sizing: border-box; }
+  html, body { margin: 0; padding: 0; background: var(--bg); color: var(--text); font-family: system-ui, -apple-system, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif; font-size: 14px; line-height: 1.45; -webkit-font-smoothing: antialiased; }
+  code { font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace; font-size: 0.82em; background: var(--surface-2); padding: 1px 5px; border-radius: 4px; border: 1px solid var(--border-soft); }
+
+  /* App Shell */
+  .shell { display: flex; min-height: 100vh; }
+
+  /* Sidebar */
+  .sidebar {
+    width: var(--sb-w); flex-shrink: 0;
+    background: var(--sidebar); border-right: 1px solid var(--border);
+    position: fixed; top: 0; bottom: 0; left: 0; z-index: 40;
+    display: flex; flex-direction: column; transition: width .16s ease;
+  }
+  .sb-brand {
+    height: 54px; padding: 0 14px; border-bottom: 1px solid var(--border);
+    display: flex; align-items: center; justify-content: space-between; gap: 8px;
+  }
+  .sb-logo { display: flex; align-items: center; gap: 10px; min-width: 0; cursor: pointer; }
+  .brand-mark {
+    width: 32px; height: 32px; border-radius: 8px; flex-shrink: 0;
+    background: linear-gradient(135deg, #1d9bf0 0%, #0ea5e9 55%, #f59e0b 100%);
+    display: grid; place-items: center; color: #fff;
+    box-shadow: 0 2px 8px rgba(29, 155, 240, 0.3);
+  }
+  .sb-title { font-weight: 800; font-size: 0.96rem; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  .sb-ver { font-size: 0.68rem; color: var(--muted); font-weight: 600; display: block; }
+  body.sb-mini .sb-hide { display: none !important; }
+
+  .sb-nav { flex: 1; overflow-y: auto; padding: 10px 8px; display: flex; flex-direction: column; gap: 2px; }
+  .sb-sec { font-size: 0.67rem; font-weight: 700; text-transform: uppercase; letter-spacing: 0.6px; color: var(--muted); padding: 10px 10px 4px; }
+  .nav-item {
+    display: flex; align-items: center; gap: 10px; padding: 9px 10px; border-radius: 8px;
+    background: transparent; border: none; color: var(--text-2); width: 100%;
+    cursor: pointer; font-size: 0.84rem; font-weight: 600; text-align: left;
+    transition: background .12s, color .12s; white-space: nowrap;
+  }
+  .nav-item:hover { background: var(--surface-hover); color: var(--text); }
+  .nav-item.active { background: var(--primary-bg); color: var(--primary); }
+  .nav-item svg { width: 18px; height: 18px; flex-shrink: 0; }
+  .nav-item .nav-lbl { flex: 1; overflow: hidden; text-overflow: ellipsis; }
+  .nav-badge {
+    font-size: 0.69rem; font-weight: 700; padding: 1px 6px; border-radius: 999px;
+    background: var(--surface-2); border: 1px solid var(--border); color: var(--text-2);
+  }
+  .nav-item.active .nav-badge { background: var(--primary); color: #fff; border-color: var(--primary); }
+  .nav-badge.warn { background: var(--amber-bg); color: var(--amber); border-color: rgba(245, 158, 11, 0.45); }
+
+  .sb-foot {
+    padding: 10px 12px; border-top: 1px solid var(--border);
+    font-size: 0.74rem; color: var(--text-2); display: flex; flex-direction: column; gap: 6px;
+  }
+  .sb-net { display: flex; align-items: center; justify-content: space-between; gap: 6px; }
+  .dot { width: 8px; height: 8px; border-radius: 50%; background: var(--green); display: inline-block; flex-shrink: 0; }
+  .dot.pulse { animation: blink 2s infinite; }
+  @keyframes blink { 0%, 100% { opacity: 1; } 50% { opacity: 0.35; } }
+
+  /* Content Area */
+  .main-wrap { flex: 1; margin-left: var(--sb-w); min-width: 0; display: flex; flex-direction: column; transition: margin-left .16s ease; }
+
+  /* Compact 54px Topbar */
+  .topbar {
+    position: sticky; top: 0; z-index: 30; height: 54px;
+    background: var(--sidebar); border-bottom: 1px solid var(--border);
+    padding: 0 16px; display: flex; align-items: center; justify-content: space-between; gap: 10px;
+  }
+  .tb-left { display: flex; align-items: center; gap: 10px; min-width: 0; flex: 1; }
+  .tb-search { position: relative; max-width: 340px; flex: 1; }
+  .tb-search svg { position: absolute; left: 10px; top: 50%; transform: translateY(-50%); width: 15px; height: 15px; color: var(--muted); pointer-events: none; }
+  .tb-search input {
+    width: 100%; background: var(--bg); color: var(--text); border: 1px solid var(--border);
+    border-radius: 8px; padding: 6px 46px 6px 32px; font-size: 0.82rem;
+  }
+  .tb-search input:focus { outline: none; border-color: var(--primary); box-shadow: 0 0 0 2px var(--primary-bg); }
+  .kbd { position: absolute; right: 8px; top: 50%; transform: translateY(-50%); font-size: 0.67rem; color: var(--muted); background: var(--surface-2); border: 1px solid var(--border); border-radius: 4px; padding: 1px 5px; pointer-events: none; }
+  .tb-right { display: flex; align-items: center; gap: 7px; flex-shrink: 0; }
+
+  /* Buttons & Pills */
+  .btn {
+    background: var(--surface-2); color: var(--text); border: 1px solid var(--border);
+    padding: 6px 11px; border-radius: 7px; font-size: 0.8rem; font-weight: 600;
+    cursor: pointer; display: inline-flex; align-items: center; gap: 6px;
+    transition: all .13s; white-space: nowrap;
+  }
+  .btn:hover { border-color: var(--primary); background: var(--surface-hover); }
+  .btn:disabled { opacity: 0.5; cursor: not-allowed; }
+  .btn svg { width: 15px; height: 15px; flex-shrink: 0; }
+  .btn-primary { background: var(--primary); color: #fff; border-color: var(--primary); }
+  .btn-primary:hover { filter: brightness(1.08); background: var(--primary); }
+  .btn-success { background: var(--green-bg); color: var(--green); border-color: rgba(34, 197, 94, 0.45); }
+  .btn-warn { background: var(--amber-bg); color: var(--amber); border-color: rgba(245, 158, 11, 0.45); }
+  .btn-danger { background: var(--red-bg); color: var(--red); border-color: rgba(239, 68, 68, 0.45); }
+  .btn-sm { padding: 4px 8px; font-size: 0.74rem; border-radius: 6px; }
+  .btn-ico { padding: 6px 8px; }
+
+  .pill {
+    display: inline-flex; align-items: center; gap: 5px; padding: 2px 8px;
+    border-radius: 999px; font-size: 0.72rem; font-weight: 700;
+    background: var(--surface-2); border: 1px solid var(--border); color: var(--text);
+    white-space: nowrap;
+  }
+  .pill.ok { background: var(--green-bg); color: var(--green); border-color: rgba(34, 197, 94, 0.38); }
+  .pill.warn { background: var(--amber-bg); color: var(--amber); border-color: rgba(245, 158, 11, 0.42); }
+  .pill.crit { background: var(--red-bg); color: var(--red); border-color: rgba(239, 68, 68, 0.42); }
+  .pill.info { background: var(--primary-bg); color: var(--primary); border-color: rgba(29, 155, 240, 0.4); }
+  .pill.purple { background: var(--purple-bg); color: var(--purple); border-color: rgba(167, 139, 250, 0.4); }
+
+  /* Workspace Content */
+  .content { padding: 16px 18px 28px; max-width: 1580px; width: 100%; margin: 0 auto; }
+  .view { display: none; }
+  .view.active { display: block; animation: fadeIn .13s ease-out; }
+  @keyframes fadeIn { from { opacity: 0; transform: translateY(3px); } to { opacity: 1; transform: translateY(0); } }
+
+  .page-hdr { display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: 10px; margin-bottom: 14px; }
+  .page-hdr h1 { margin: 0; font-size: 1.15rem; font-weight: 800; letter-spacing: -0.2px; display: flex; align-items: center; gap: 8px; }
+  .page-sub { font-size: 0.78rem; color: var(--muted); }
+
+  /* Cards & Grids */
+  .card { background: var(--surface); border: 1px solid var(--border); border-radius: var(--r); box-shadow: var(--shadow); overflow: hidden; }
+  .card-hdr {
+    padding: 11px 15px; border-bottom: 1px solid var(--border); background: var(--surface-2);
+    display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: 8px;
+  }
+  .card-hdr h2, .card-hdr h3 { margin: 0; font-size: 0.9rem; font-weight: 700; display: flex; align-items: center; gap: 7px; }
+  .card-body { padding: 14px 15px; }
+  .grid-2 { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 14px; }
+  .dash-top { display: grid; grid-template-columns: 240px minmax(0, 1fr); gap: 14px; margin-bottom: 14px; }
+  .kpi-4 { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 10px; }
+  .kpi { background: var(--surface); border: 1px solid var(--border); border-radius: var(--r); padding: 12px 14px; }
+  .kpi-l { font-size: 0.69rem; text-transform: uppercase; letter-spacing: 0.5px; color: var(--muted); font-weight: 700; }
+  .kpi-v { font-size: 1.32rem; font-weight: 800; margin-top: 3px; }
+  .kpi-s { font-size: 0.73rem; color: var(--text-2); margin-top: 2px; }
+  .dash-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(305px, 1fr)); gap: 12px; }
+
+  /* Filters & Inputs */
+  .chips { display: flex; flex-wrap: wrap; gap: 6px; }
+  .chip {
+    padding: 4px 10px; border-radius: 999px; font-size: 0.74rem; font-weight: 600;
+    background: var(--surface); border: 1px solid var(--border); color: var(--text-2); cursor: pointer;
+  }
+  .chip:hover { border-color: var(--primary); color: var(--text); }
+  .chip.active { background: var(--primary); border-color: var(--primary); color: #fff; }
+  .input, select.input {
+    background: var(--bg); color: var(--text); border: 1px solid var(--border);
+    padding: 7px 11px; border-radius: 7px; font-size: 0.82rem; width: 100%;
+  }
+  .input:focus { outline: none; border-color: var(--primary); box-shadow: 0 0 0 2px var(--primary-bg); }
+  .switch-row {
+    display: flex; align-items: center; justify-content: space-between; gap: 10px;
+    padding: 9px 12px; border-radius: 8px; background: var(--surface-2); border: 1px solid var(--border-soft);
+  }
+
+  /* Tables */
+  .table-wrap { overflow-x: auto; -webkit-overflow-scrolling: touch; }
+  table.z2m { width: 100%; border-collapse: collapse; font-size: 0.83rem; }
+  .z2m th {
+    text-align: left; padding: 9px 12px; font-size: 0.71rem; font-weight: 700;
+    text-transform: uppercase; letter-spacing: 0.4px; color: var(--muted);
+    background: var(--surface-2); border-bottom: 1px solid var(--border);
+    white-space: nowrap; cursor: pointer; user-select: none;
+  }
+  .z2m th:hover { color: var(--primary); }
+  .z2m td { padding: 9px 12px; border-bottom: 1px solid var(--border-soft); vertical-align: middle; }
+  .z2m tbody tr { cursor: pointer; transition: background .11s; }
+  .z2m tbody tr:hover { background: var(--surface-hover); }
+  .z2m tbody tr.sel { background: var(--primary-bg); }
+
+  table.kv { width: 100%; border-collapse: collapse; font-size: 0.82rem; }
+  table.kv td { padding: 8px 10px; border-bottom: 1px solid var(--border-soft); vertical-align: top; }
+  table.kv td:first-child { color: var(--muted); font-weight: 600; width: 38%; }
+
+  .dev-cell { display: flex; align-items: center; gap: 10px; min-width: 185px; }
+  .dev-ico {
+    width: 38px; height: 38px; border-radius: 9px; flex-shrink: 0; overflow: hidden; position: relative;
+    display: grid; place-items: center; background: var(--surface-2); border: 1px solid var(--border);
+  }
+  .dev-ico img { width: 100%; height: 100%; object-fit: contain; padding: 3px; display: block; }
+  .dev-ico .svg-fb { display: grid; place-items: center; width: 100%; height: 100%; }
+  .dev-ico.leader { color: var(--amber); background: var(--amber-bg); border-color: rgba(245, 158, 11, 0.4); }
+  .dev-ico.router { color: var(--primary); background: var(--primary-bg); border-color: rgba(29, 155, 240, 0.4); }
+  .dev-ico.sed { color: var(--purple); background: var(--purple-bg); border-color: rgba(167, 139, 250, 0.4); }
+  .dev-ico.child { color: var(--green); background: var(--green-bg); border-color: rgba(34, 197, 94, 0.4); }
+  .dev-name { font-weight: 700; display: flex; align-items: center; gap: 6px; flex-wrap: wrap; }
+  .dev-sub { font-size: 0.72rem; color: var(--muted); margin-top: 1px; }
+
+  .sig-bars { display: inline-flex; gap: 2px; align-items: flex-end; height: 13px; vertical-align: middle; margin-right: 5px; }
+  .sig-bars i { display: block; width: 3px; border-radius: 1px; background: var(--border); }
+  .sig-bars.excellent i.on, .sig-bars.leader i.on { background: var(--green); }
+  .sig-bars.good i.on { background: var(--primary); }
+  .sig-bars.fair i.on { background: var(--amber); }
+  .sig-bars.weak i.on { background: var(--red); }
+
+  .bar-track { width: 58px; height: 6px; background: var(--bg); border-radius: 999px; overflow: hidden; display: inline-block; vertical-align: middle; margin-right: 6px; }
+  .bar-track i { display: block; height: 100%; border-radius: 999px; }
+
+  /* Mobile Device Cards */
+  .mobile-cards { display: none; gap: 10px; padding: 12px; flex-direction: column; }
+  .m-card { background: var(--surface-2); border: 1px solid var(--border); border-radius: 10px; padding: 12px; cursor: pointer; }
+  .m-card-meta { display: grid; grid-template-columns: repeat(2, 1fr); gap: 8px; margin-top: 9px; padding-top: 9px; border-top: 1px solid var(--border-soft); font-size: 0.78rem; }
+
+  /* Subtabs & Exposes */
+  .subtabs { display: flex; gap: 4px; border-bottom: 1px solid var(--border); overflow-x: auto; background: var(--surface-2); padding: 0 12px; }
+  .subtabs button { background: transparent; border: none; border-bottom: 2px solid transparent; color: var(--text-2); padding: 10px 13px; font-size: 0.82rem; font-weight: 600; cursor: pointer; white-space: nowrap; }
+  .subtabs button.active { color: var(--primary); border-bottom-color: var(--primary); }
+  .expose-row { display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: 10px; padding: 11px 14px; border-radius: 8px; background: var(--surface-2); border: 1px solid var(--border-soft); margin-bottom: 8px; }
+
+  /* Map Canvas */
+  .map-layout { display: grid; grid-template-columns: minmax(0, 1fr) 350px; gap: 14px; align-items: start; }
+  .map-stage { position: relative; background: var(--term); overflow: hidden; }
+  body.light .map-stage { background: #eaf2fb; }
+  svg#meshSvg {
+    width: 100%; height: 570px; display: block; cursor: grab; user-select: none; touch-action: none;
+    background-image: radial-gradient(rgba(148, 163, 184, 0.18) 1px, transparent 1px);
+    background-size: 22px 22px;
+  }
+  svg#meshSvg:active { cursor: grabbing; }
+  .map-legend {
+    position: absolute; bottom: 12px; left: 12px; background: rgba(15, 20, 28, 0.88);
+    border: 1px solid var(--border); border-radius: 8px; padding: 6px 10px;
+    display: flex; flex-wrap: wrap; gap: 10px; font-size: 0.72rem; color: #e2e8f0;
+  }
+  body.light .map-legend { background: rgba(255, 255, 255, 0.92); color: var(--text); }
+  .leg-dot { width: 9px; height: 9px; border-radius: 50%; display: inline-block; margin-right: 4px; vertical-align: middle; }
+  @keyframes pulseRing { 0% { r: 26; opacity: 0.75; } 100% { r: 46; opacity: 0; } }
+  .leader-pulse { animation: pulseRing 2.2s ease-out infinite; }
+  @keyframes meshFlow { from { stroke-dashoffset: 24; } to { stroke-dashoffset: 0; } }
+  .mesh-flow { stroke-dasharray: 5 7; stroke-linecap: round; animation: meshFlow 1.15s linear infinite; }
+  .mesh-flow.slow { animation-duration: 2.2s; }
+  @media (prefers-reduced-motion: reduce) { .leader-pulse, .mesh-flow { animation: none !important; } }
+
+  /* Spectrum & Terminal */
+  svg#spectrumSvg { width: 100%; height: 270px; display: block; background: var(--surface-2); border-radius: 8px; border: 1px solid var(--border-soft); }
+  .log-box { background: var(--term); color: #dbe7f5; height: 520px; overflow-y: auto; padding: 10px 12px; font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace; font-size: 0.76rem; }
+  .log-line { padding: 5px 4px; border-bottom: 1px dashed rgba(148, 163, 184, 0.14); display: grid; grid-template-columns: 66px 48px 64px minmax(0, 1fr); gap: 8px; }
+  pre.term { background: var(--term); color: #cbd5e1; border: 1px solid var(--border); border-radius: 8px; padding: 12px; overflow: auto; font-size: 0.76rem; max-height: 400px; margin: 0; white-space: pre-wrap; word-break: break-word; }
+
+  /* Join Wizard Checklist */
+  .check-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(210px, 1fr)); gap: 10px; margin-bottom: 14px; }
+  .check-box { background: var(--surface-2); border: 1px solid var(--border); border-radius: 9px; padding: 10px 12px; display: flex; align-items: center; gap: 10px; }
+  .decode-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(135px, 1fr)); gap: 8px; margin-top: 10px; }
+  .decode-kv { background: var(--surface-2); border: 1px solid var(--border-soft); border-radius: 8px; padding: 8px 10px; }
+  .decode-kv .dk { font-size: 0.68rem; color: var(--muted); text-transform: uppercase; font-weight: 700; }
+  .decode-kv .dv { font-size: 0.92rem; font-weight: 800; color: var(--primary); margin-top: 2px; }
+
+  /* Settings Split */
+  .settings-layout { display: grid; grid-template-columns: 220px minmax(0, 1fr); gap: 14px; align-items: start; }
+  .settings-nav { display: flex; flex-direction: column; gap: 4px; padding: 8px; }
+  .settings-nav button { text-align: left; background: transparent; border: 1px solid transparent; color: var(--text-2); padding: 9px 11px; border-radius: 7px; font-size: 0.82rem; font-weight: 600; cursor: pointer; }
+  .settings-nav button:hover { background: var(--surface-hover); color: var(--text); }
+  .settings-nav button.active { background: var(--primary-bg); color: var(--primary); border-color: rgba(29, 155, 240, 0.35); }
+
+  /* Mobile Bottom Nav + Drawer */
+  .bottom-nav { display: none; }
+  .mobile-sheet { display: none; position: fixed; inset: 0; z-index: 60; background: rgba(0, 0, 0, 0.55); }
+  .mobile-sheet.open { display: flex; align-items: flex-end; }
+  .mobile-sheet-body { width: 100%; background: var(--sidebar); border-top: 1px solid var(--border); border-radius: 16px 16px 0 0; padding: 14px; max-height: 78vh; overflow-y: auto; display: grid; grid-template-columns: repeat(2, 1fr); gap: 8px; }
+
+  /* Auth Modal (only shown when frontend.auth_token is configured) */
+  .auth-overlay { display: none; position: fixed; inset: 0; z-index: 95; background: rgba(9, 14, 22, 0.88); backdrop-filter: blur(5px); align-items: center; justify-content: center; padding: 16px; }
+  .auth-overlay.open { display: flex; }
+
+  .toast { position: fixed; bottom: 20px; right: 20px; z-index: 99; background: var(--surface); border: 1px solid var(--primary); color: var(--text); padding: 10px 14px; border-radius: 9px; box-shadow: 0 10px 28px rgba(0,0,0,0.45); font-size: 0.82rem; font-weight: 600; display: none; max-width: min(390px, 90vw); }
+
+  @media (max-width: 1220px) {
+    .map-layout { grid-template-columns: 1fr; }
+    .dash-top { grid-template-columns: 1fr; }
+    .kpi-4 { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+  }
+  @media (max-width: 960px) {
+    .sidebar { display: none; }
+    .main-wrap { margin-left: 0; padding-bottom: 66px; }
+    .grid-2, .settings-layout { grid-template-columns: 1fr; }
+    .settings-nav { flex-direction: row; overflow-x: auto; }
+    .settings-nav button { white-space: nowrap; }
+    .hide-sm { display: none !important; }
+    .bottom-nav {
+      display: grid; grid-template-columns: repeat(5, 1fr);
+      position: fixed; bottom: 0; left: 0; right: 0; z-index: 50; height: 60px;
+      background: var(--sidebar); border-top: 1px solid var(--border);
+      padding-bottom: env(safe-area-inset-bottom);
+    }
+    .bn-btn {
+      background: transparent; border: none; color: var(--muted);
+      display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 3px;
+      font-size: 0.67rem; font-weight: 700; cursor: pointer;
+    }
+    .bn-btn svg { width: 19px; height: 19px; }
+    .bn-btn.active { color: var(--primary); }
+    .toast { bottom: 72px; right: 12px; }
+  }
+  @media (max-width: 720px) {
+    .content { padding: 12px 10px 20px; }
+    .topbar { padding: 0 10px; }
+    .desktop-table { display: none; }
+    .mobile-cards { display: flex; }
+    svg#meshSvg { height: 420px; }
+    .log-line { grid-template-columns: 58px 44px 1fr; }
+    .log-line .log-src { display: none; }
+    .kbd { display: none; }
+  }
+</style>
+</head>
+<body>
+<div class="shell">
+
+  <!-- Left Collapsible Sidebar -->
+  <aside class="sidebar">
+    <div class="sb-brand">
+      <div class="sb-logo" onclick="navigate('devices')">
+        <div class="brand-mark">
+          <svg width="19" height="19" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2">
+            <circle cx="12" cy="12" r="3"/><path d="M12 3v4M12 17v4M4.2 7.5l3.5 2M16.3 14.5l3.5 2M19.8 7.5l-3.5 2M7.7 14.5l-3.5 2"/>
+          </svg>
+        </div>
+        <div class="sb-hide">
+          <span class="sb-title">Thread2MQTT</span>
+          <span class="sb-ver">v0.5 · Rust std</span>
+        </div>
+      </div>
+      <button class="btn btn-ico btn-sm" onclick="toggleSidebar()" title="Réduire / Étendre la barre latérale">⇆</button>
+    </div>
+
+    <nav class="sb-nav" id="sidebarNav">
+      <div class="sb-sec sb-hide" data-i18n="sec_mesh">Principal (Ordre Z2M)</div>
+      <button class="nav-item active" data-view="devices" onclick="navigate('devices')">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="4" width="18" height="14" rx="2"/><path d="M8 21h8M12 18v3"/></svg>
+        <span class="nav-lbl sb-hide" data-i18n="nav_devices">Appareils</span>
+        <span class="nav-badge sb-hide" id="cntNodes">0</span>
+      </button>
+      <button class="nav-item" data-view="dashboard" onclick="navigate('dashboard')">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="3" width="7" height="9" rx="1"/><rect x="14" y="3" width="7" height="5" rx="1"/><rect x="14" y="12" width="7" height="9" rx="1"/><rect x="3" y="16" width="7" height="5" rx="1"/></svg>
+        <span class="nav-lbl sb-hide" data-i18n="nav_dash">Tableau de bord</span>
+      </button>
+      <button class="nav-item" data-view="matter" onclick="navigate('matter')">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M10 13a5 5 0 0 0 7.54.54l3-3a5 5 0 0 0-7.07-7.07l-1.72 1.71"/><path d="M14 11a5 5 0 0 0-7.54-.54l-3 3a5 5 0 0 0 7.07 7.07l1.71-1.71"/></svg>
+        <span class="nav-lbl sb-hide" data-i18n="nav_matter">Groupes</span>
+        <span class="nav-badge sb-hide" id="cntMatter">0</span>
+      </button>
+      <button class="nav-item" data-view="map" onclick="navigate('map')">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="5" r="2.5"/><circle cx="5" cy="18" r="2.5"/><circle cx="19" cy="18" r="2.5"/><path d="M10.7 7.2L6.3 15.8M13.3 7.2l4.4 8.6M7.5 18h9"/></svg>
+        <span class="nav-lbl sb-hide" data-i18n="nav_map">Carte</span>
+      </button>
+      <button class="nav-item" data-view="ota" onclick="navigate('ota')">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/></svg>
+        <span class="nav-lbl sb-hide" data-i18n="nav_ota">OTA</span>
+        <span class="nav-badge warn sb-hide" id="cntIssues">0</span>
+      </button>
+      <button class="nav-item" data-view="settings" onclick="navigate('settings')">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 1 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 1 1-4 0v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 1 1-2.83-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 1 1 0-4h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 1 1 2.83-2.83l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1-1.51V3a2 2 0 1 1 4 0v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 1 1 2.83 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9c.26.6.85 1 1.51 1H21a2 2 0 1 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1z"/></svg>
+        <span class="nav-lbl sb-hide" data-i18n="nav_settings">Paramètres</span>
+      </button>
+
+      <div class="sb-sec sb-hide adv-only" data-i18n="sec_diag">Mode Avancé (Expert RF)</div>
+      <button class="nav-item adv-only" data-view="radio" onclick="navigate('radio')">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M4.9 19.1C1 15.2 1 8.8 4.9 4.9M7.8 16.2c-2.3-2.3-2.3-6.1 0-8.5M19.1 4.9c3.9 3.9 3.9 10.3 0 14.2M16.2 7.8c2.3 2.3 2.3 6.1 0 8.5"/><circle cx="12" cy="12" r="2"/></svg>
+        <span class="nav-lbl sb-hide" data-i18n="nav_radio">Radio &amp; Spectre</span>
+      </button>
+      <button class="nav-item adv-only" data-view="dev" onclick="navigate('dev')">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="4 17 10 11 4 5"/><line x1="12" y1="19" x2="20" y2="19"/></svg>
+        <span class="nav-lbl sb-hide" data-i18n="nav_dev">Console Dev</span>
+      </button>
+      <button class="nav-item adv-only" data-view="logs" onclick="navigate('logs')">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/></svg>
+        <span class="nav-lbl sb-hide" data-i18n="nav_logs">Logs Live</span>
+      </button>
+    </nav>
+
+    <div class="sb-foot">
+      <div class="sb-net">
+        <span style="display:flex;align-items:center;gap:6px;min-width:0"><span class="dot pulse" id="sbDot"></span><strong class="sb-hide" id="sbNetName" style="overflow:hidden;text-overflow:ellipsis;white-space:nowrap">Connexion...</strong></span>
+        <span class="pill ok sb-hide" id="sbCh">CH —</span>
+      </div>
+      <div class="sb-net sb-hide">
+        <span id="sbHealthTxt" style="color:var(--muted)">Santé —</span>
+        <span id="sbMatterTxt" style="color:var(--primary);font-weight:700">Matter —</span>
+      </div>
+    </div>
+  </aside>
+
+  <!-- Main Workspace -->
+  <div class="main-wrap">
+    <header class="topbar">
+      <div class="tb-left">
+        <div class="tb-search">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/></svg>
+          <input id="globalSearch" placeholder="Rechercher un appareil, MAC, RLOC16, Matter..." oninput="onGlobalSearch(this.value)" />
+          <span class="kbd">Ctrl K</span>
+        </div>
+        <span class="pill ok hide-sm" id="modeBadge" style="cursor:pointer" onclick="navigate('settings');setSettingsTab('yaml')" title="Mode de sécurité configuration.yaml">Read-Only</span>
+        <span class="pill warn" id="hdrMode" style="display:none">DEMO SANDBOX</span>
+      </div>
+
+      <div class="tb-right">
+        <button class="btn btn-primary" id="btnTopJoin" onclick="navigate('join')" title="Autoriser l'appairage / Rejoindre un appareil Thread/Matter">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2"><path d="M12 5v14M5 12h14"/></svg>
+          <span id="btnTopJoinLbl" data-i18n="btn_join">Autoriser l'appairage</span>
+        </button>
+        <button class="btn" id="btnAdvMode" onclick="toggleAdvMode()" title="Basculer Mode Simple (débutant) / Mode Avancé (Radio, ot-ctl, JSON, Logs)">Simple</button>
+        <button class="btn hide-sm" id="btnSandbox" onclick="toggleSandbox()"><span data-i18n="btn_demo">Démo</span></button>
+        <button class="btn hide-sm" onclick="toggleContrib(true)" title="Open-Source MIT · Contribuer"><span data-i18n="btn_contrib">Contribuer</span></button>
+        <button class="btn btn-ico hide-sm" id="btnLang" onclick="toggleLang()" title="Français / English">FR</button>
+        <button class="btn btn-ico" onclick="pollNow()" title="Rafraîchir OTBR + Matter">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="23 4 23 10 17 10"/><path d="M20.49 15a9 9 0 1 1-2.12-9.36L23 10"/></svg>
+        </button>
+        <button class="btn btn-ico" id="btnTheme" onclick="toggleTheme()" title="Thème Sombre / Clair">◐</button>
+      </div>
+    </header>
+
+    <main class="content">
+
+      <!-- VIEW 1: APPAREILS (table + sparklines + mobile cards) -->
+      <section id="view-devices" class="view active">
+        <div class="page-hdr">
+          <div>
+            <h1><span data-i18n="nav_devices">Appareils</span> <span class="pill info" id="devCountPill">0</span></h1>
+            <div class="page-sub" id="devSubMeta">Chargement du maillage Thread &amp; Matter...</div>
+          </div>
+          <div class="chips" id="roleChips">
+            <span class="chip active" onclick="setFilter('all', this)">Tous</span>
+            <span class="chip" onclick="setFilter('leader', this)">Border Router</span>
+            <span class="chip" onclick="setFilter('router', this)">Routeurs</span>
+            <span class="chip" onclick="setFilter('sed', this)">Piles (SED)</span>
+            <span class="chip" onclick="setFilter('matter', this)">Matter L7</span>
+            <span class="chip" onclick="setFilter('weak', this)">Signal faible</span>
+          </div>
+        </div>
+
+        <div class="card">
+          <div class="table-wrap desktop-table">
+            <table class="z2m">
+              <thead>
+                <tr>
+                  <th onclick="sortBy('friendly_name')">Appareil ⇅</th>
+                  <th onclick="sortBy('ext_address')">IEEE / RLOC16 ⇅</th>
+                  <th onclick="sortBy('matter_vendor')">Modèle ⇅</th>
+                  <th onclick="sortBy('role')">Rôle ⇅</th>
+                  <th onclick="sortBy('avg_rssi_dbm')">Signal &amp; Tendance ⇅</th>
+                  <th onclick="sortBy('battery_pct')">Alim ⇅</th>
+                  <th>État Matter L7</th>
+                  <th onclick="sortBy('health_score')">Santé ⇅</th>
+                  <th style="text-align:right">Actions</th>
+                </tr>
+              </thead>
+              <tbody id="nodesTbody"></tbody>
+            </table>
+          </div>
+          <div class="mobile-cards" id="nodesCards"></div>
+        </div>
+      </section>
+
+      <!-- VIEW 1B: FICHE APPAREIL COMPLETE (/device/<ext_addr>) -->
+      <section id="view-device-detail" class="view">
+        <div class="page-hdr">
+          <div style="display:flex;align-items:center;gap:10px;flex-wrap:wrap">
+            <button class="btn" onclick="navigate('devices')">← Appareils</button>
+            <div id="detailTitleWrap" style="display:flex;align-items:center;gap:8px;flex-wrap:wrap"></div>
+          </div>
+          <div id="detailQuickActions" style="display:flex;gap:7px;flex-wrap:wrap"></div>
+        </div>
+        <div class="card">
+          <div class="subtabs" id="detailTabs">
+            <button class="active" data-dtab="about" onclick="setDetailTab('about')">À propos</button>
+            <button data-dtab="exposes" onclick="setDetailTab('exposes')">Exposes <span class="nav-badge" id="dtCntExp">0</span></button>
+            <button class="adv-only" data-dtab="radio" onclick="setDetailTab('radio')">Radio &amp; SRP</button>
+            <button class="adv-only" data-dtab="clusters" onclick="setDetailTab('clusters')">Clusters &amp; Fabrics</button>
+            <button class="adv-only" data-dtab="state" onclick="setDetailTab('state')">État (JSON)</button>
+            <button data-dtab="settings" onclick="setDetailTab('settings')">Paramètres</button>
+          </div>
+          <div class="card-body" id="detailBody"></div>
+        </div>
+      </section>
+
+      <!-- VIEW 2: DASHBOARD (Health Donut Ring + KPIs + Advisor + Live Exposes Grid) -->
+      <section id="view-dashboard" class="view">
+        <div class="page-hdr">
+          <div>
+            <h1 data-i18n="nav_dash">Dashboard</h1>
+            <div class="page-sub">Vue d'ensemble santé radio, alertes Advisor et Exposes temps réel</div>
+          </div>
+        </div>
+
+        <div class="dash-top">
+          <div class="card" style="display:flex;flex-direction:column;align-items:center;justify-content:center;padding:18px;text-align:center">
+            <svg width="124" height="124" viewBox="0 0 120 120">
+              <circle cx="60" cy="60" r="48" fill="none" stroke="var(--surface-2)" stroke-width="11"/>
+              <circle id="healthRing" cx="60" cy="60" r="48" fill="none" stroke="var(--green)" stroke-width="11" stroke-linecap="round" stroke-dasharray="301.6" stroke-dashoffset="301.6" transform="rotate(-90 60 60)"/>
+              <text id="healthRingTxt" x="60" y="58" text-anchor="middle" fill="var(--text)" font-size="24" font-weight="800">—</text>
+              <text x="60" y="76" text-anchor="middle" fill="var(--muted)" font-size="10" font-weight="700">SANTÉ MESH</text>
+            </svg>
+            <div id="healthRingSub" style="font-size:0.78rem;color:var(--text-2);margin-top:6px">—</div>
+          </div>
+
+          <div style="display:flex;flex-direction:column;gap:10px">
+            <div class="kpi-4">
+              <div class="kpi"><div class="kpi-l">Réseau Thread</div><div class="kpi-v" id="kNet">—</div><div class="kpi-s" id="kPan">—</div></div>
+              <div class="kpi"><div class="kpi-l">Appareils / Routeurs</div><div class="kpi-v" id="kNodes">0</div><div class="kpi-s" id="kRoles">—</div></div>
+              <div class="kpi"><div class="kpi-l">Livraison IPv6 / MAC</div><div class="kpi-v" id="kDelivery">—</div><div class="kpi-s" id="kMacSub">—</div></div>
+              <div class="kpi"><div class="kpi-l">Matter L7 / Piles</div><div class="kpi-v" id="kMatter">—</div><div class="kpi-s" id="kBat">—</div></div>
+            </div>
+            <div class="card">
+              <div class="card-body" id="dashAdvisor" style="display:flex;flex-wrap:wrap;gap:8px;padding:10px 12px"></div>
+            </div>
+          </div>
+        </div>
+
+        <div class="dash-grid" id="dashboardGrid"></div>
+      </section>
+
+      <!-- VIEW 3: CARTE MESH INTERACTIVE -->
+      <section id="view-map" class="view">
+        <div class="map-layout">
+          <div class="card">
+            <div class="card-hdr">
+              <h3>Carte Topologique Thread (Zoom / Drag / Pan)</h3>
+              <div style="display:flex;flex-wrap:wrap;gap:6px">
+                <button class="btn btn-sm btn-primary" id="btnAnim" onclick="toggleMeshAnim()" title="Animation du flux télémétrique sur les liens">Flux animé</button>
+                <button class="btn btn-sm" id="btnHeat" onclick="toggleHeatmap()">Heatmap</button>
+                <button class="btn btn-sm" onclick="zoomMap(1.2)" title="Zoomer">+</button>
+                <button class="btn btn-sm" onclick="zoomMap(0.84)" title="Dézoomer">−</button>
+                <button class="btn btn-sm" onclick="resetMapLayout()">↺ Centrer</button>
+                <button class="btn btn-sm" onclick="exportMapSvg()">↓ SVG</button>
+              </div>
+            </div>
+            <div class="map-stage">
+              <svg id="meshSvg" viewBox="0 0 860 570"></svg>
+              <div class="map-legend">
+                <span><i class="leg-dot" style="background:#f59e0b"></i>Leader</span>
+                <span><i class="leg-dot" style="background:#1d9bf0"></i>Routeur</span>
+                <span><i class="leg-dot" style="background:#a78bfa"></i>SED (Piles)</span>
+                <span><i class="leg-dot" style="background:#22c55e"></i>Child</span>
+              </div>
+            </div>
+          </div>
+
+          <div class="card">
+            <div class="card-hdr">
+              <h3 id="mapSideTitle">Nœud sélectionné</h3>
+              <button class="btn btn-sm btn-primary" id="mapOpenFullBtn" style="display:none" onclick="openDevice(SELECTED_EXT)">Fiche complète ➔</button>
+            </div>
+            <div class="card-body" id="mapInspector">
+              <p style="color:var(--muted);margin:0">Cliquez sur un nœud de la carte pour inspecter sa liaison radio, ses Exposes Matter et sa tendance RSSI.</p>
+            </div>
+          </div>
+        </div>
+      </section>
+
+      <!-- VIEW 4: APPAIRER / JOIN WIZARD (Real Matter-over-Thread Commissioning + mDNS Discovery + Multi-Admin ECW) -->
+      <section id="view-join" class="view">
+        <div class="page-hdr">
+          <div>
+            <h1>Appairer un appareil Thread / Matter</h1>
+            <div class="page-sub">Découverte locale mDNS, validation QR/code manuel en Rust local et pilotage <code>python-matter-server</code> gouverné par <code>configuration.yaml</code></div>
+          </div>
+          <button class="btn" onclick="navigate('settings');setSettingsTab('yaml')">Ouvrir configuration.yaml</button>
+        </div>
+
+        <div class="check-grid" id="joinChecks"></div>
+
+        <div class="grid-2" style="margin-bottom:14px">
+          <!-- Step 1: Join by QR / Manual Code -->
+          <div class="card">
+            <div class="card-hdr">
+              <h3>1. Rejoindre par Code QR (<code>MT:...</code>) ou Code Manuel</h3>
+              <span class="pill info" id="joinLockPill">Vérification...</span>
+            </div>
+            <div class="card-body">
+              <div style="display:flex;gap:8px;margin-bottom:8px;flex-wrap:wrap">
+                <input class="input" id="matterCodeIn" style="flex:1;min-width:190px" placeholder="MT:Y.K9042C00KA0648G00 ou 3497-011-2332" value="MT:Y.K9042C00KA0648G00" oninput="decodeMatterLive()" />
+                <button class="btn" id="btnQrCam" onclick="toggleQrScan()" title="Scanner le QR Code Matter via la caméra (BarcodeDetector natif, 0 librairie externe)">
+                  <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M23 19a2 2 0 0 1-2 2H3a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h4l2-3h6l2 3h4a2 2 0 0 1 2 2z"/><circle cx="12" cy="13" r="4"/></svg>
+                  Scanner QR
+                </button>
+                <button class="btn" onclick="decodeMatterLive()">Décoder</button>
+              </div>
+              <div class="qr-box" id="qrScannerBox" style="display:none">
+                <video id="qrVideo" autoplay playsinline muted></video>
+                <div style="display:flex;justify-content:space-between;align-items:center;padding:8px 10px;background:var(--surface-2);font-size:0.78rem">
+                  <span id="qrStatus">Pointez le QR Code Matter (MT:...) devant la caméra...</span>
+                  <button class="btn btn-sm btn-danger" onclick="stopQrScan()">✕ Fermer</button>
+                </div>
+              </div>
+              <div class="chips" style="margin-bottom:10px">
+                <span class="chip" onclick="document.getElementById('matterCodeIn').value='MT:Y.K9042C00KA0648G00';decodeMatterLive()">Test QR (MT:...)</span>
+                <span class="chip" onclick="document.getElementById('matterCodeIn').value='3497-011-2332';decodeMatterLive()">Test Manuel (11 chiffres)</span>
+              </div>
+              <div id="decodeVisual"></div>
+
+              <div class="switch-row" style="margin-top:12px">
+                <span style="font-size:0.8rem">Appareil déjà sur le réseau IP (<code>network_only</code>, sans BLE)</span>
+                <input type="checkbox" id="chkNetworkOnly" />
+              </div>
+
+              <div style="display:flex;gap:8px;flex-wrap:wrap;margin-top:12px;align-items:center">
+                <button class="btn btn-primary" id="btnCommission" onclick="commissionDevice()">+ Appairer cet appareil (Join)</button>
+                <span id="commissionHint" style="font-size:0.76rem;color:var(--muted)"></span>
+              </div>
+              <pre class="term" id="commissionOut" style="display:none;margin-top:10px;max-height:160px"></pre>
+            </div>
+          </div>
+
+          <!-- Step 2: mDNS Discovery + Multi-Admin ECW -->
+          <div style="display:flex;flex-direction:column;gap:14px">
+            <div class="card">
+              <div class="card-hdr">
+                <h3>2. Découverte locale mDNS (<code>_matterc._udp</code>)</h3>
+                <button class="btn btn-sm btn-primary" id="btnDiscover" onclick="discoverCommissionable()">Scanner le réseau</button>
+              </div>
+              <div class="card-body">
+                <p style="font-size:0.79rem;color:var(--muted);margin:0 0 10px">Recherche en lecture seule les appareils Matter/Thread en mode appairage autour de votre Border Router (sûr même en <code>read_only_mode: true</code>).</p>
+                <div id="discoverOut" style="font-size:0.8rem;color:var(--muted)">Cliquez sur « Scanner le réseau » pour lancer une découverte mDNS.</div>
+              </div>
+            </div>
+
+            <div class="card">
+              <div class="card-hdr"><h3>3. Partage Multi-Admin (Apple / Google / Alexa · ECW)</h3></div>
+              <div class="card-body">
+                <p style="font-size:0.79rem;color:var(--muted);margin:0 0 10px">Génère un code temporaire (300s) sur un appareil déjà appairé pour l'ajouter dans un autre écosystème Matter sans le réinitialiser.</p>
+                <div style="display:flex;gap:8px;flex-wrap:wrap">
+                  <select class="input" id="ecwNodeSel" style="flex:1;min-width:190px"></select>
+                  <button class="btn btn-success" id="btnEcw" onclick="openMultiAdminEcw()">Ouvrir fenêtre ECW</button>
+                </div>
+                <pre class="term" id="ecwOut" style="display:none;margin-top:10px;max-height:150px"></pre>
+              </div>
+            </div>
+          </div>
+        </div>
+      </section>
+
+      <!-- VIEW 5: RADIO & SPECTRE 2.4 GHZ -->
+      <section id="view-radio" class="view">
+        <div class="card" style="margin-bottom:14px">
+          <div class="card-hdr">
+            <div>
+              <h3>Analyseur Spectre RF 2.4 GHz (IEEE 802.15.4 · Canaux 11–26)</h3>
+              <div style="font-size:0.76rem;color:var(--muted);margin-top:2px">Coexistence Wi-Fi (Ch 1/6/11), coordinateur Zigbee, canal Thread actif et bruit réel <code>ot-ctl scan energy</code>.</div>
+            </div>
+            <button class="btn btn-primary" id="btnScan" onclick="runEnergyScan()">⚡ Scanner l'énergie RF</button>
+          </div>
+          <div class="card-body"><svg id="spectrumSvg" viewBox="0 0 920 270"></svg></div>
+        </div>
+        <div class="grid-2">
+          <div class="card">
+            <div class="card-hdr"><h3>Compteurs MAC 802.15.4</h3><code>ot-ctl counters mac</code></div>
+            <div class="card-body"><table class="kv" id="macTable"></table></div>
+          </div>
+          <div class="card">
+            <div class="card-hdr"><h3>Compteurs IPv6 6LoWPAN</h3><code>ot-ctl counters ip</code></div>
+            <div class="card-body"><table class="kv" id="ipTable"></table></div>
+          </div>
+        </div>
+      </section>
+
+      <!-- VIEW 6: MATTER & GROUPES -->
+      <section id="view-matter" class="view">
+        <div class="card" style="margin-bottom:14px">
+          <div class="card-hdr">
+            <h3>Corrélation Matter L7 ↔ Thread L2/L3 (SRP <code>_matter._tcp</code>)</h3>
+            <span class="pill info" id="matterSdkPill">—</span>
+          </div>
+          <div class="table-wrap">
+            <table class="z2m">
+              <thead><tr><th>Node</th><th>Appareil</th><th>Fabricant / Modèle</th><th>FW / Série</th><th>Batterie</th><th>RLOC16 / IPv6 OMR</th><th>Fabrics</th><th>État</th><th>Actions</th></tr></thead>
+              <tbody id="matterTbody"></tbody>
+            </table>
+          </div>
+        </div>
+        <div class="grid-2">
+          <div class="card"><div class="card-hdr"><h3>Groupes logiques (persistés)</h3></div><div class="card-body" id="groupsBox"></div></div>
+          <div class="card"><div class="card-hdr"><h3>Fabrics Matter opérationnelles</h3></div><div class="card-body" id="fabricsBox"></div></div>
+        </div>
+      </section>
+
+      <!-- VIEW 7: OTA & ADVISOR SANTÉ -->
+      <section id="view-ota" class="view">
+        <div class="card" style="margin-bottom:14px">
+          <div class="card-hdr"><h3>Smart Mesh Advisor — Diagnostics &amp; Actions Recommandées</h3></div>
+          <div class="card-body" id="advisorFull"></div>
+        </div>
+        <div class="card">
+          <div class="card-hdr"><h3>Matrice OTA Firmware (CSA DCL) &amp; Flotte Piles</h3></div>
+          <div class="table-wrap">
+            <table class="z2m">
+              <thead><tr><th>Appareil</th><th>Modèle</th><th>Thread</th><th>SW / HW</th><th>Batterie</th><th>Statut</th><th>Vérification OTA (DCL)</th></tr></thead>
+              <tbody id="otaTbody"></tbody>
+            </table>
+          </div>
+        </div>
+      </section>
+
+      <!-- VIEW 8: CONSOLE DEV -->
+      <section id="view-dev" class="view">
+        <div class="grid-2">
+          <div class="card">
+            <div class="card-hdr">
+              <h3>Console <code>ot-ctl</code> (15 commandes lecture seule)</h3>
+              <button class="btn btn-sm" onclick="copyText(document.getElementById('otctlOut').textContent)">📋 Copier</button>
+            </div>
+            <div class="card-body">
+              <div class="chips" id="otctlBtns" style="margin-bottom:12px"></div>
+              <pre class="term" id="otctlOut" style="min-height:290px">Cliquez sur une commande ot-ctl ci-dessus pour interroger le Border Router...</pre>
+            </div>
+          </div>
+          <div class="card">
+            <div class="card-hdr"><h3>Routage IPv6 &amp; Registre SRP <code>_matter._tcp</code></h3></div>
+            <div class="card-body">
+              <div style="font-size:0.75rem;color:var(--muted);font-weight:700;margin-bottom:5px">Préfixe OMR &amp; Adresses IPv6 Border Router</div>
+              <pre class="term" id="ipv6Pre" style="max-height:150px;margin-bottom:14px">—</pre>
+              <div style="font-size:0.75rem;color:var(--muted);font-weight:700;margin-bottom:6px">Services SRP actifs</div>
+              <div class="table-wrap">
+                <table class="z2m">
+                  <thead><tr><th>Node</th><th>MAC Étendue</th><th>IPv6 OMR</th><th>Bail</th><th>ICD SII/SAI</th></tr></thead>
+                  <tbody id="srpTbody"></tbody>
+                </table>
+              </div>
+            </div>
+          </div>
+        </div>
+      </section>
+
+      <!-- VIEW 9: LOGS LIVE (SSE /api/events) -->
+      <section id="view-logs" class="view">
+        <div class="card">
+          <div class="card-hdr">
+            <div style="display:flex;align-items:center;gap:8px"><span class="dot pulse" id="sseDot"></span><h3>Logs Temps Réel (SSE · <code>/api/events</code>)</h3></div>
+            <div style="display:flex;flex-wrap:wrap;gap:6px;align-items:center">
+              <select class="input" id="logLevel" style="width:auto" onchange="renderLogs()">
+                <option value="ALL">Tous niveaux</option><option value="INFO">INFO</option><option value="WARN">WARN</option><option value="TX">TX</option>
+              </select>
+              <select class="input" id="logSrc" style="width:auto" onchange="renderLogs()">
+                <option value="ALL">Toutes sources</option><option value="OTBR">OTBR</option><option value="MATTER">MATTER</option><option value="MQTT">MQTT</option><option value="DEV">DEV</option><option value="RF">RF</option><option value="HTTP">HTTP</option>
+              </select>
+              <input class="input" id="logSearch" style="width:160px" placeholder="Filtrer..." oninput="renderLogs()" />
+              <button class="btn btn-sm" id="btnPauseLog" onclick="toggleLogPause()">⏸ Pause</button>
+              <button class="btn btn-sm" onclick="exportLogs()">⬇️ .jsonl</button>
+              <button class="btn btn-sm" onclick="LOG_BUFFER=[];renderLogs()">🧹 Vider</button>
+            </div>
+          </div>
+          <div class="log-box" id="logBox"></div>
+        </div>
+      </section>
+
+      <!-- VIEW 10: PARAMÈTRES & configuration.yaml -->
+      <section id="view-settings" class="view">
+        <div class="settings-layout">
+          <div class="card">
+            <div class="settings-nav" id="settingsNav">
+              <button class="active" data-stab="yaml" onclick="setSettingsTab('yaml')">📄 configuration.yaml</button>
+              <button data-stab="vault" onclick="setSettingsTab('vault')">🔐 Border Router &amp; Vault</button>
+              <button data-stab="discovery" onclick="setSettingsTab('discovery')">🏠 HA MQTT Discovery</button>
+              <button class="adv-only" data-stab="metrics" onclick="setSettingsTab('metrics')">📈 Prometheus &amp; Backup</button>
+            </div>
+          </div>
+
+          <!-- Sub-tab: configuration.yaml viewer + interactive generator -->
+          <div id="stab-yaml" class="card">
+            <div class="card-hdr">
+              <h3><code>configuration.yaml</code> — Matériel Local, Bluetooth Serveur &amp; Générateur</h3>
+              <div style="display:flex;gap:6px;flex-wrap:wrap">
+                <button class="btn btn-sm btn-success" id="btnHwScan" onclick="runHardwareScan()">🔍 Détecter matériel (USB / Bluetooth / Ports)</button>
+                <button class="btn btn-sm" onclick="copyText(document.getElementById('yamlPreview').textContent)">📋 Copier YAML</button>
+                <button class="btn btn-sm btn-primary" onclick="downloadYamlConfig()">⬇️ configuration.yaml</button>
+              </div>
+            </div>
+            <div class="card-body">
+              <div class="hw-box">
+                <div style="display:flex;flex-wrap:wrap;align-items:center;justify-content:space-between;gap:8px">
+                  <div style="font-size:0.8rem;font-weight:700">📡 Détection matérielle locale (lecture seule — zéro <code>docker.sock</code>)</div>
+                  <div style="display:flex;align-items:center;gap:8px;flex-wrap:wrap">
+                    <label for="yBt" style="font-size:0.76rem;color:var(--muted);font-weight:700">Bluetooth Serveur (BLE) :</label>
+                    <select class="input" id="yBt" style="width:auto;padding:5px 9px" onchange="rebuildYamlGenerator()">
+                      <option value="none">Aucun (appairage via smartphone HA)</option>
+                      <option value="0">hci0 — Adaptateur Bluetooth serveur #0</option>
+                      <option value="1">hci1 — Adaptateur Bluetooth serveur #1</option>
+                    </select>
+                  </div>
+                </div>
+                <div class="hw-chips" id="hwScanOut"><span class="pill">Cliquez sur « Détecter matériel » pour scanner <code>/sys/class/bluetooth</code>, USB RCP et ports locaux (:5580 / :8081).</span></div>
+              </div>
+              <div class="grid-2" style="margin-bottom:12px">
+                <div style="display:flex;flex-direction:column;gap:8px">
+                  <div style="font-size:0.76rem;font-weight:700;color:var(--muted);text-transform:uppercase">Options du générateur (pour votre déploiement)</div>
+                  <label class="switch-row"><span><code>advanced.read_only_mode</code> (verrou prod)</span><input type="checkbox" id="yRo" checked onchange="rebuildYamlGenerator()" /></label>
+                  <label class="switch-row"><span><code>matter.allow_commissioning</code> (Join &amp; ECW)</span><input type="checkbox" id="yComm" onchange="rebuildYamlGenerator()" /></label>
+                  <label class="switch-row"><span><code>mqtt.enabled</code> + HA Auto-Discovery</span><input type="checkbox" id="yMqtt" onchange="rebuildYamlGenerator()" /></label>
+                  <label class="switch-row"><span><code>frontend.auth_token</code> (protection Bearer)</span><input type="checkbox" id="yAuth" onchange="rebuildYamlGenerator()" /></label>
+                </div>
+                <div>
+                  <div style="font-size:0.76rem;font-weight:700;color:var(--muted);text-transform:uppercase;margin-bottom:6px">Aperçu <code>configuration.yaml</code> prêt à monter dans <code>/data/</code></div>
+                  <pre class="term" id="yamlPreview" style="max-height:270px"></pre>
+                </div>
+              </div>
+              <div id="btComposeWrap" style="display:none;margin-bottom:12px">
+                <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:6px">
+                  <span style="font-size:0.76rem;font-weight:700;color:var(--primary);text-transform:uppercase">🐳 Extrait <code>docker-compose.yml</code> — Bluetooth Serveur pour <code>matter-server</code></span>
+                  <button class="btn btn-sm" onclick="copyText(document.getElementById('btComposePre').textContent)">📋 Copier Compose</button>
+                </div>
+                <pre class="term" id="btComposePre" style="max-height:175px"></pre>
+              </div>
+              <div style="font-size:0.76rem;font-weight:700;color:var(--muted);text-transform:uppercase;margin-bottom:6px">Configuration active de cette instance (secrets masqués)</div>
+              <pre class="term" id="activeYamlPre" style="max-height:220px">Chargement...</pre>
+            </div>
+          </div>
+
+          <div id="stab-vault" class="card" style="display:none">
+            <div class="card-hdr"><h3>OpenThread Border Router &amp; Dataset Vault</h3><span class="pill ok">🛡️ Clés masquées</span></div>
+            <div class="card-body">
+              <table class="kv" id="brTable"></table>
+              <p style="font-size:0.78rem;color:var(--muted);margin:12px 0 0">Zero-Trust : <code>networkKey</code> et <code>PSKc</code> sont masqués dès l'ingestion et ne transitent jamais sur MQTT ni dans les exports.</p>
+            </div>
+          </div>
+
+          <div id="stab-discovery" class="card" style="display:none">
+            <div class="card-hdr">
+              <h3>Home Assistant MQTT Auto-Discovery <span id="discoCount" style="color:var(--primary)"></span></h3>
+              <input class="input" id="discoSearch" style="max-width:240px" placeholder="Filtrer topics..." oninput="renderDiscovery()" />
+            </div>
+            <div class="card-body" id="discoList" style="max-height:540px;overflow-y:auto"></div>
+          </div>
+
+          <div id="stab-metrics" class="card" style="display:none">
+            <div class="card-hdr">
+              <h3>Backup JSON Zero-Trust &amp; Prometheus <code>/metrics</code></h3>
+              <div style="display:flex;gap:7px">
+                <button class="btn btn-sm btn-primary" onclick="downloadBackup()">💾 Backup JSON</button>
+                <button class="btn btn-sm" onclick="loadMetricsPreview()">🔄 Charger /metrics</button>
+              </div>
+            </div>
+            <div class="card-body"><pre class="term" id="metricsPre" style="max-height:460px">Cliquez sur « Charger /metrics »...</pre></div>
+          </div>
+        </div>
+      </section>
+
+    </main>
+  </div>
+</div>
+
+<!-- Mobile Fixed 5-Tab Bottom Bar -->
+<nav class="bottom-nav" id="mobileBottomNav">
+  <button class="bn-btn active" data-view="devices" onclick="navigate('devices')">
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="4" width="18" height="14" rx="2"/><path d="M8 21h8M12 18v3"/></svg>
+    <span>Appareils</span>
+  </button>
+  <button class="bn-btn" data-view="map" onclick="navigate('map')">
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="5" r="2.5"/><circle cx="5" cy="18" r="2.5"/><circle cx="19" cy="18" r="2.5"/><path d="M10.7 7.2L6.3 15.8M13.3 7.2l4.4 8.6"/></svg>
+    <span>Carte</span>
+  </button>
+  <button class="bn-btn" data-view="join" onclick="navigate('join')">
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="9"/><path d="M12 8v8M8 12h8"/></svg>
+    <span>Appairer</span>
+  </button>
+  <button class="bn-btn" data-view="logs" onclick="navigate('logs')">
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/></svg>
+    <span>Logs</span>
+  </button>
+  <button class="bn-btn" onclick="toggleMobileSheet(true)">
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="5" r="1.6"/><circle cx="12" cy="12" r="1.6"/><circle cx="12" cy="19" r="1.6"/></svg>
+    <span>Plus</span>
+  </button>
+</nav>
+
+<!-- Mobile "Plus" Bottom Sheet -->
+<div class="mobile-sheet" id="mobileSheet" onclick="if(event.target===this)toggleMobileSheet(false)">
+  <div class="mobile-sheet-body">
+    <button class="btn" onclick="navigate('dashboard');toggleMobileSheet(false)">🧩 Dashboard</button>
+    <button class="btn" onclick="navigate('radio');toggleMobileSheet(false)">📡 Radio &amp; Spectre</button>
+    <button class="btn" onclick="navigate('matter');toggleMobileSheet(false)">🔗 Matter &amp; Groupes</button>
+    <button class="btn" onclick="navigate('ota');toggleMobileSheet(false)">🩺 OTA &amp; Santé</button>
+    <button class="btn" onclick="navigate('dev');toggleMobileSheet(false)">🛠️ Console ot-ctl</button>
+    <button class="btn" onclick="navigate('settings');toggleMobileSheet(false)">⚙️ Config YAML</button>
+    <button class="btn" onclick="toggleSandbox();toggleMobileSheet(false)">🧪 Démo 6 Nœuds</button>
+    <button class="btn" onclick="toggleLang();toggleMobileSheet(false)">🌐 FR / EN</button>
+    <button class="btn" onclick="toggleContrib(true);toggleMobileSheet(false)" style="grid-column:span 2">🤝 Open-Source MIT &amp; Contribuer</button>
+  </div>
+</div>
+
+<!-- Open-Source Contribute Modal -->
+<div class="auth-overlay" id="contribOverlay" onclick="if(event.target===this)toggleContrib(false)">
+  <div class="card" style="width:min(520px,100%)">
+    <div class="card-hdr">
+      <h3>🤝 Thread2MQTT v0.5 — Open-Source MIT &amp; Contribuer</h3>
+      <button class="btn btn-sm" onclick="toggleContrib(false)">✕</button>
+    </div>
+    <div class="card-body" style="display:grid;gap:10px;font-size:0.83rem">
+      <p style="margin:0"><strong>Thread2MQTT</strong> est un projet open-source <strong>MIT</strong>, léger et ouvert à tous, écrit en <strong>Rust pur <code>std</code></strong> (0 crate externe, &lt; 1 Mo RAM, 0 CDN).</p>
+      <div style="background:var(--surface-2);border:1px solid var(--border);border-radius:8px;padding:10px;font-size:0.79rem;color:var(--text-2)">
+        <strong>Ambition :</strong> rendre les réseaux <strong>Thread (OTBR)</strong> et <strong>Matter-over-Thread</strong> simples à observer, diagnostiquer et exploiter au quotidien, pour accélérer l'adoption de Thread par toute la communauté domotique. Toutes les contributions sont les bienvenues !
+      </div>
+      <div style="display:grid;gap:6px;font-size:0.79rem">
+        <div>• <strong>Contribuer facilement :</strong> lisez <code>AGENTS.md</code> et <code>CONTRIBUTING.md</code> pour ajouter un cluster Matter ou un appareil en quelques lignes.</div>
+        <div>• <strong>Photos d'appareils :</strong> déposez vos PNG <code>512×512</code> dans <code>&lt;data_dir&gt;/device_images/</code> ou configurez <code>frontend.device_images_base_url</code>.</div>
+        <div>• <strong>Supervision native :</strong> pack prêt à importer dans <code>monitoring/</code> (Grafana + alertes Prometheus + <code>/api/alerts</code>).</div>
+      </div>
+      <div style="display:flex;gap:8px;flex-wrap:wrap;justify-content:flex-end;margin-top:4px">
+        <a class="btn btn-primary" href="https://github.com/ravindrajob/thread2mqtt" target="_blank" rel="noopener" style="text-decoration:none">⭐ GitHub Open-Source</a>
+        <button class="btn" onclick="toggleContrib(false)">Fermer</button>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- Optional Auth Gate (only visible if frontend.auth_token is enabled) -->
+<div class="auth-overlay" id="authOverlay">
+  <div class="card" style="width:min(380px,100%)">
+    <div class="card-hdr"><h3>🔐 Authentification Thread2MQTT</h3></div>
+    <div class="card-body" style="display:grid;gap:10px">
+      <p style="font-size:0.8rem;color:var(--muted);margin:0">Cette instance requiert le jeton configuré dans <code>frontend.auth_token</code>.</p>
+      <input class="input" type="password" id="authTokenIn" placeholder="Jeton Bearer..." />
+      <button class="btn btn-primary" onclick="submitAuthToken()">Se connecter</button>
+    </div>
+  </div>
+</div>
+
+<div class="toast" id="toast"></div>
+
+<script>
+let STATE = null;
+let CFG = { read_only_mode: true, can_commission: false, can_interview: false, allow_ota_check: true, matter_configured: false, otctl_configured: false, mqtt_enabled: false, sanitized_yaml: '' };
+let SANDBOX_MODE = false;
+let CURRENT_VIEW = 'devices';
+let SELECTED_EXT = null;
+let DETAIL_TAB = 'about';
+let SETTINGS_TAB = 'yaml';
+let ROLE_FILTER = 'all';
+let SORT_KEY = 'role';
+let SORT_ASC = true;
+let HEATMAP_MODE = false;
+let ANIM_MESH = true;
+let LOG_BUFFER = [];
+let LOG_PAUSED = false;
+let DISCO_ITEMS = [];
+let FILTERED_DISCO = [];
+let OTA_RESULTS = {};
+let SSE_CONN = null;
+let LANG = localStorage.getItem('t2m_lang') || ((navigator.language || 'fr').toLowerCase().startsWith('fr') ? 'fr' : 'en');
+let ADV_MODE = localStorage.getItem('t2m_adv') === '1';
+let HW_SCAN = null;
+let QR_STREAM = null;
+let QR_RAF = null;
+let JOIN_TIMER = null;
+let JOIN_REMAINING = 0;
+
+let NODE_POS = {};
+let MAP_VIEW = { x: 0, y: 0, w: 860, h: 570 };
+let DRAG_NODE = null;
+let PAN_STATE = null;
+
+const OTCTL_CMDS = [
+  'state','router table','child table','neighbor table','counters mac','counters ip',
+  'srp server service','ipaddr','netdata show','br omrprefix','br onlinkprefix','channel','panid','extpanid','version'
+];
+
+const I18N = {
+  fr: { sec_mesh: 'Principal (Ordre Z2M)', sec_diag: 'Mode Avancé (Expert RF)', nav_devices: 'Appareils', nav_dash: 'Tableau de bord', nav_map: 'Carte', nav_join: 'Appairer (Join)', nav_radio: 'Radio & Spectre', nav_matter: 'Groupes', nav_ota: 'OTA', nav_dev: 'Console Dev', nav_logs: 'Logs Live', nav_settings: 'Paramètres', btn_join: 'Autoriser l\'appairage', btn_demo: 'Démo', btn_contrib: 'Contribuer', search_ph: 'Rechercher un appareil, MAC, RLOC16, Matter...' },
+  en: { sec_mesh: 'Main (Z2M Order)', sec_diag: 'Advanced Mode (RF Expert)', nav_devices: 'Devices', nav_dash: 'Dashboard', nav_map: 'Map', nav_join: 'Permit Join', nav_radio: 'Radio & Spectrum', nav_matter: 'Groups', nav_ota: 'OTA', nav_dev: 'Dev Console', nav_logs: 'Logs', nav_settings: 'Settings', btn_join: 'Permit join', btn_demo: 'Demo', btn_contrib: 'Contribute', search_ph: 'Search device, IEEE MAC, RLOC16, Matter...' }
+};
+
+function authHeaders(extra) {
+  const h = Object.assign({}, extra || {});
+  const tok = sessionStorage.getItem('t2m_auth_token');
+  if (tok) h['Authorization'] = 'Bearer ' + tok;
+  return h;
+}
+
+async function apiFetch(url, opts) {
+  const o = Object.assign({}, opts || {});
+  o.headers = authHeaders(o.headers);
+  const r = await fetch(url, o);
+  if (r.status === 401) {
+    document.getElementById('authOverlay').classList.add('open');
+  }
+  return r;
+}
+
+function submitAuthToken() {
+  const tok = document.getElementById('authTokenIn').value.trim();
+  if (!tok) return;
+  sessionStorage.setItem('t2m_auth_token', tok);
+  document.cookie = 't2m_auth=' + tok + '; Path=/; SameSite=Strict' + (location.protocol === 'https:' ? '; Secure' : '');
+  document.getElementById('authOverlay').classList.remove('open');
+  loadConfig();
+  loadState();
+  connectSse();
+}
+
+function toast(msg) {
+  const el = document.getElementById('toast');
+  el.textContent = msg;
+  el.style.display = 'block';
+  clearTimeout(window._tTmr);
+  window._tTmr = setTimeout(() => el.style.display = 'none', 3400);
+}
+
+function esc(s) {
+  return String(s ?? '').replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+}
+
+function applyLang() {
+  const dict = I18N[LANG] || I18N.fr;
+  document.querySelectorAll('[data-i18n]').forEach(el => {
+    const k = el.getAttribute('data-i18n');
+    if (dict[k]) el.textContent = dict[k];
+  });
+  const gs = document.getElementById('globalSearch');
+  if (gs && dict.search_ph) gs.placeholder = dict.search_ph;
+  document.getElementById('btnLang').textContent = LANG.toUpperCase();
+}
+
+function toggleContrib(open) {
+  document.getElementById('contribOverlay').classList.toggle('open', open);
+}
+
+function toggleMeshAnim() {
+  ANIM_MESH = !ANIM_MESH;
+  document.getElementById('btnAnim').classList.toggle('btn-primary', ANIM_MESH);
+  renderMap();
+}
+
+function toggleLang() {
+  LANG = LANG === 'fr' ? 'en' : 'fr';
+  localStorage.setItem('t2m_lang', LANG);
+  applyLang();
+}
+
+function applyAdvMode() {
+  document.body.classList.toggle('adv-mode', ADV_MODE);
+  const b = document.getElementById('btnAdvMode');
+  if (b) {
+    b.textContent = ADV_MODE ? (LANG === 'en' ? 'Advanced' : 'Avancé') : 'Simple';
+    b.classList.toggle('btn-warn', ADV_MODE);
+  }
+  if (!ADV_MODE && ['radio', 'dev', 'logs'].includes(CURRENT_VIEW)) navigate('devices');
+  if (!ADV_MODE && CURRENT_VIEW === 'device-detail' && ['radio', 'clusters', 'state'].includes(DETAIL_TAB)) setDetailTab('about');
+  if (!ADV_MODE && CURRENT_VIEW === 'settings' && SETTINGS_TAB === 'metrics') setSettingsTab('yaml');
+}
+
+function toggleAdvMode() {
+  ADV_MODE = !ADV_MODE;
+  localStorage.setItem('t2m_adv', ADV_MODE ? '1' : '0');
+  applyAdvMode();
+  toast(ADV_MODE ? 'Mode Avancé activé (Radio RF, ot-ctl, JSON, Logs)' : 'Mode Simple actif (vue épurée style Zigbee2MQTT)');
+}
+
+function startJoinCountdown(seconds) {
+  clearInterval(JOIN_TIMER);
+  JOIN_REMAINING = Math.max(0, seconds || 0);
+  const btn = document.getElementById('btnTopJoin');
+  const lbl = document.getElementById('btnTopJoinLbl');
+  const tick = () => {
+    if (JOIN_REMAINING <= 0) {
+      clearInterval(JOIN_TIMER); JOIN_TIMER = null;
+      if (btn) btn.className = 'btn btn-primary';
+      applyLang();
+      return;
+    }
+    const m = Math.floor(JOIN_REMAINING / 60), s = String(JOIN_REMAINING % 60).padStart(2, '0');
+    if (btn) btn.className = 'btn btn-success';
+    if (lbl) lbl.textContent = (LANG === 'en' ? 'Join open ' : 'Appairage ') + `(${m}:${s})`;
+    JOIN_REMAINING--;
+  };
+  tick();
+  JOIN_TIMER = setInterval(tick, 1000);
+}
+
+function applySavedPrefs() {
+  if (localStorage.getItem('t2m_theme') === 'light') document.body.classList.add('light');
+  document.getElementById('btnTheme').textContent = document.body.classList.contains('light') ? '◑' : '◐';
+  if (localStorage.getItem('t2m_sb') === 'mini') document.body.classList.add('sb-mini');
+  const qs = new URLSearchParams(location.search);
+  if (qs.get('lang') === 'fr' || qs.get('lang') === 'en') LANG = qs.get('lang');
+  if (qs.get('adv') === '1') ADV_MODE = true;
+  else if (qs.get('adv') === '0') ADV_MODE = false;
+  applyLang();
+  applyAdvMode();
+}
+
+function toggleTheme() {
+  document.body.classList.toggle('light');
+  const l = document.body.classList.contains('light');
+  localStorage.setItem('t2m_theme', l ? 'light' : 'dark');
+  document.getElementById('btnTheme').textContent = l ? '◑' : '◐';
+}
+
+function toggleSidebar() {
+  document.body.classList.toggle('sb-mini');
+  localStorage.setItem('t2m_sb', document.body.classList.contains('sb-mini') ? 'mini' : 'full');
+}
+
+function toggleMobileSheet(open) {
+  document.getElementById('mobileSheet').classList.toggle('open', open);
+}
+
+function navigate(viewId) {
+  if (CURRENT_VIEW === 'join' && viewId !== 'join') stopQrScan();
+  CURRENT_VIEW = viewId;
+  document.querySelectorAll('.view').forEach(v => v.classList.remove('active'));
+  const target = document.getElementById('view-' + viewId);
+  if (target) target.classList.add('active');
+  const navKey = viewId === 'device-detail' ? 'devices' : viewId;
+  document.querySelectorAll('#sidebarNav .nav-item, #mobileBottomNav .bn-btn').forEach(b => {
+    b.classList.toggle('active', b.getAttribute('data-view') === navKey);
+  });
+  if (viewId === 'map') renderMap();
+  if (viewId === 'radio') renderSpectrum();
+  if (viewId === 'join') { renderJoinView(); decodeMatterLive(); if (!HW_SCAN) runHardwareScan(true); }
+  if (viewId === 'settings') {
+    if (SETTINGS_TAB === 'discovery') loadDiscovery();
+    if (SETTINGS_TAB === 'metrics') loadMetricsPreview();
+    if (!HW_SCAN) runHardwareScan(true);
+    rebuildYamlGenerator();
+  }
+  if (viewId === 'device-detail') renderDeviceDetail();
+}
+
+function onGlobalSearch(val) {
+  if (CURRENT_VIEW !== 'devices' && val.trim().length > 0) navigate('devices');
+  renderDevices();
+}
+
+function openDevice(ext, tab) {
+  if (!ext) return;
+  SELECTED_EXT = ext;
+  if (tab) DETAIL_TAB = tab;
+  if (!ADV_MODE && ['radio', 'clusters', 'state'].includes(DETAIL_TAB)) DETAIL_TAB = 'about';
+  navigate('device-detail');
+}
+
+function setDetailTab(tab) {
+  DETAIL_TAB = tab;
+  document.querySelectorAll('#detailTabs button').forEach(b => b.classList.toggle('active', b.getAttribute('data-dtab') === tab));
+  renderDeviceDetail();
+}
+
+function setSettingsTab(tab) {
+  SETTINGS_TAB = tab;
+  document.querySelectorAll('#settingsNav button').forEach(b => b.classList.toggle('active', b.getAttribute('data-stab') === tab));
+  ['yaml', 'vault', 'discovery', 'metrics'].forEach(k => {
+    document.getElementById('stab-' + k).style.display = k === tab ? 'block' : 'none';
+  });
+  if (tab === 'discovery') loadDiscovery();
+  if (tab === 'metrics') loadMetricsPreview();
+  if (tab === 'yaml') rebuildYamlGenerator();
+}
+
+function setFilter(f, el) {
+  ROLE_FILTER = f;
+  document.querySelectorAll('#roleChips .chip').forEach(c => c.classList.remove('active'));
+  if (el) el.classList.add('active');
+  renderDevices();
+}
+
+function sortBy(key) {
+  if (SORT_KEY === key) SORT_ASC = !SORT_ASC;
+  else { SORT_KEY = key; SORT_ASC = true; }
+  renderDevices();
+}
+
+function roleLabel(role) {
+  if (role === 'leader') return ['Leader', 'warn'];
+  if (role === 'router') return ['Routeur', 'info'];
+  if (role === 'sed') return ['SED', 'purple'];
+  return ['Child', 'ok'];
+}
+
+function deviceIconSvg(n) {
+  const prod = ((n.matter_product || '') + ' ' + (n.friendly_name || '') + ' ' + (n.matter_clusters || []).join(' ')).toLowerCase();
+  if (n.role === 'leader') {
+    return '<svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><rect x="3" y="13" width="18" height="7" rx="2"/><path d="M7 13V8M17 13V8M7 6a2 2 0 0 1 2-2M17 6a2 2 0 0 0-2-2"/><circle cx="7.5" cy="16.5" r="1" fill="currentColor"/><circle cx="11.5" cy="16.5" r="1" fill="currentColor"/><line x1="15" y1="16.5" x2="18" y2="16.5"/></svg>';
+  }
+  if (prod.includes('smoke') || prod.includes('fum') || prod.includes('co')) {
+    return '<svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><circle cx="12" cy="12" r="9"/><circle cx="12" cy="12" r="5" stroke-dasharray="2 2"/><circle cx="12" cy="12" r="2" fill="currentColor"/></svg>';
+  }
+  if (prod.includes('bulb') || prod.includes('light') || prod.includes('lamp') || prod.includes('colorcontrol')) {
+    return '<svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M9 18h6M10 21h4M12 3a6 6 0 0 0-3.5 10.9c.7.5 1 1.3 1 2.1h5c0-.8.3-1.6 1-2.1A6 6 0 0 0 12 3z"/></svg>';
+  }
+  if (prod.includes('plug') || prod.includes('energy') || prod.includes('prise') || prod.includes('onoff')) {
+    return '<svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><rect x="4" y="4" width="16" height="16" rx="4"/><circle cx="9.5" cy="12" r="1.3" fill="currentColor"/><circle cx="14.5" cy="12" r="1.3" fill="currentColor"/><path d="M12 7v2"/></svg>';
+  }
+  if (prod.includes('climate') || prod.includes('temp') || prod.includes('humid')) {
+    return '<svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><rect x="4" y="4" width="16" height="16" rx="3"/><path d="M8 10h8M8 14h5"/><circle cx="15.5" cy="14" r="1" fill="currentColor"/></svg>';
+  }
+  if (prod.includes('door') || prod.includes('window') || prod.includes('contact') || prod.includes('booleanstate')) {
+    return '<svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><rect x="4" y="5" width="9" height="14" rx="2"/><rect x="16" y="7" width="4" height="10" rx="1.5"/></svg>';
+  }
+  if (prod.includes('motion') || prod.includes('occupancy')) {
+    return '<svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><circle cx="12" cy="12" r="8"/><path d="M8.5 12a3.5 3.5 0 0 1 7 0"/><circle cx="12" cy="12" r="1.4" fill="currentColor"/></svg>';
+  }
+  return '<svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><polygon points="12 3 20 7.5 20 16.5 12 21 4 16.5 4 7.5"/><circle cx="12" cy="12" r="2.5"/></svg>';
+}
+
+function resolveDeviceImgUrl(n) {
+  if (n.icon) {
+    if (/^https?:\/\//i.test(n.icon)) return n.icon;
+    const clean = n.icon.replace(/^\/?device[_-]images\//i, '').replace(/[^a-zA-Z0-9._-]/g, '');
+    if (clean) return 'device-images/' + clean;
+  }
+  if (CFG.device_images_base_url && n.matter_product) {
+    const slug = ((n.matter_vendor || '') + '_' + n.matter_product).toLowerCase().replace(/[^a-z0-9]+/g, '_').replace(/^_|_$/g, '');
+    if (slug) return CFG.device_images_base_url.replace(/\/+$/, '') + '/' + slug + '.png';
+  }
+  return null;
+}
+
+function deviceVisualHtml(n) {
+  const svg = deviceIconSvg(n);
+  const url = resolveDeviceImgUrl(n);
+  if (!url) return `<span class="svg-fb">${svg}</span>`;
+  return `<img src="${esc(url)}" alt="" loading="lazy" onerror="this.style.display='none';this.nextElementSibling.style.display='grid'" /><span class="svg-fb" style="display:none">${svg}</span>`;
+}
+
+function sigBars(rssi, quality) {
+  const bars = rssi === 0 ? 4 : rssi >= -65 ? 4 : rssi >= -75 ? 3 : rssi >= -85 ? 2 : 1;
+  let h = `<span class="sig-bars ${esc(quality)}">`;
+  for (let i = 1; i <= 4; i++) h += `<i style="height:${i * 3 + 1}px" class="${i <= bars ? 'on' : ''}"></i>`;
+  return h + '</span>';
+}
+
+function rssiSparkline(hist, quality, w, h) {
+  const arr = (hist && hist.length >= 2) ? hist : null;
+  if (!arr) return '';
+  const W = w || 76, H = h || 20;
+  const col = quality === 'excellent' ? '#22c55e' : quality === 'good' ? '#1d9bf0' : quality === 'fair' ? '#f59e0b' : '#ef4444';
+  const pts = arr.map((v, i) => {
+    const x = (i / Math.max(1, arr.length - 1)) * (W - 4) + 2;
+    const norm = Math.max(0, Math.min(1, (v + 100) / 55));
+    const y = (H - 3) - norm * (H - 6);
+    return `${x.toFixed(1)},${y.toFixed(1)}`;
+  }).join(' ');
+  return `<svg width="${W}" height="${H}" viewBox="0 0 ${W} ${H}" style="vertical-align:middle;margin-left:6px"><polyline fill="none" stroke="${col}" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" points="${pts}"/></svg>`;
+}
+
+function healthColor(s) { return s >= 85 ? 'var(--green)' : s >= 65 ? 'var(--amber)' : 'var(--red)'; }
+
+function filteredNodes() {
+  if (!STATE) return [];
+  const q = (document.getElementById('globalSearch')?.value || '').toLowerCase();
+  let rows = STATE.nodes.filter(n => {
+    if (ROLE_FILTER === 'leader' && n.role !== 'leader') return false;
+    if (ROLE_FILTER === 'router' && n.role !== 'router') return false;
+    if (ROLE_FILTER === 'sed' && !n.is_sleepy) return false;
+    if (ROLE_FILTER === 'matter' && !n.matter_node_id) return false;
+    if (ROLE_FILTER === 'weak' && (n.role === 'leader' || n.avg_rssi_dbm > -84)) return false;
+    return !q || JSON.stringify(n).toLowerCase().includes(q);
+  });
+  rows.sort((a, b) => {
+    const va = a[SORT_KEY] ?? '', vb = b[SORT_KEY] ?? '';
+    return (va > vb ? 1 : va < vb ? -1 : 0) * (SORT_ASC ? 1 : -1);
+  });
+  return rows;
+}
+
+function renderDevices() {
+  const rows = filteredNodes();
+  document.getElementById('devCountPill').textContent = rows.length;
+  if (STATE) {
+    document.getElementById('devSubMeta').textContent = `${STATE.br.network_name} · Canal ${STATE.br.channel} · ${STATE.br.router_count} routeur(s) · IPv6 ${(STATE.ip_counters?.delivery_rate_pct ?? 100).toFixed(1)}% · MàJ ${new Date().toTimeString().slice(0, 8)}`;
+  }
+
+  document.getElementById('nodesTbody').innerHTML = rows.map(n => {
+    const [rTxt, rCls] = roleLabel(n.role);
+    const batHtml = n.battery_pct != null
+      ? `<strong style="color:${n.battery_pct > 30 ? 'var(--green)' : 'var(--red)'}">${n.battery_pct}%</strong><div class="dev-sub">${n.battery_mv ? (n.battery_mv / 1000).toFixed(2) + 'V' : ''} ${esc(n.battery_type || '')}</div>`
+      : (n.is_sleepy ? 'SED' : '<span style="color:var(--green);font-weight:600">Secteur</span>');
+    return `
+      <tr class="${n.ext_address === SELECTED_EXT ? 'sel' : ''}" onclick="openDevice('${esc(n.ext_address)}')">
+        <td>
+          <div class="dev-cell">
+            <div class="dev-ico ${esc(n.role)}">${deviceVisualHtml(n)}</div>
+            <div>
+              <div class="dev-name">${esc(n.friendly_name)} ${n.group ? `<span class="pill" style="font-size:0.65rem;padding:0 6px">${esc(n.group)}</span>` : ''}</div>
+              <div class="dev-sub">${esc(n.description || (n.matter_node_id ? 'Matter Node #' + n.matter_node_id : 'OpenThread Leader'))}</div>
+            </div>
+          </div>
+        </td>
+        <td><code>${esc(n.ext_address)}</code><div class="dev-sub">RLOC16 <code>${esc(n.rloc16)}</code></div></td>
+        <td><strong>${esc(n.matter_vendor || 'OpenThread')}</strong><div class="dev-sub">${esc(n.matter_product || 'Thread Node')}${n.matter_sw_version ? ' · FW ' + esc(n.matter_sw_version) : ''}</div></td>
+        <td><span class="pill ${rCls}">${rTxt}</span></td>
+        <td>
+          <div>${sigBars(n.avg_rssi_dbm, n.signal_quality)}<strong>${n.role === 'leader' ? 'Local' : n.avg_rssi_dbm + ' dBm'}</strong>${rssiSparkline(n.rssi_history, n.signal_quality)}</div>
+          <div class="dev-sub">LQI ${n.lq_in}/${n.lq_out} · il y a ${n.age_sec}s</div>
+        </td>
+        <td>${batHtml}</td>
+        <td>${n.matter_state ? `<span class="pill info">${esc(n.matter_state)}</span>` : '<span style="color:var(--muted)">Thread seul</span>'}</td>
+        <td><span class="bar-track"><i style="width:${n.health_score}%;background:${healthColor(n.health_score)}"></i></span><strong style="color:${healthColor(n.health_score)}">${n.health_score}%</strong></td>
+        <td style="text-align:right;white-space:nowrap" onclick="event.stopPropagation()">
+          <button class="btn btn-sm" onclick="openDevice('${esc(n.ext_address)}','exposes')" title="Exposes">Exposes</button>
+          <button class="btn btn-sm" onclick="quickRename('${esc(n.ext_address)}','${esc(n.friendly_name)}')" title="Renommer en 1 clic">✎</button>
+          ${n.matter_node_id ? `<button class="btn btn-sm btn-success" onclick="pingMatter(${n.matter_node_id})" title="Matter Ping">Ping</button>` : ''}
+        </td>
+      </tr>`;
+  }).join('') || '<tr><td colspan="9" style="text-align:center;color:var(--muted);padding:24px">Aucun appareil trouvé.</td></tr>';
+
+  document.getElementById('nodesCards').innerHTML = rows.map(n => {
+    const [rTxt, rCls] = roleLabel(n.role);
+    return `
+      <div class="m-card" onclick="openDevice('${esc(n.ext_address)}')">
+        <div style="display:flex;justify-content:space-between;align-items:flex-start;gap:8px">
+          <div class="dev-cell" style="min-width:0">
+            <div class="dev-ico ${esc(n.role)}">${deviceVisualHtml(n)}</div>
+            <div style="min-width:0">
+              <div class="dev-name">${esc(n.friendly_name)}</div>
+              <div class="dev-sub">${esc(n.matter_vendor || 'OpenThread')} · <code>${esc(n.rloc16)}</code></div>
+            </div>
+          </div>
+          <span class="pill ${rCls}">${rTxt}</span>
+        </div>
+        <div class="m-card-meta">
+          <div><span style="color:var(--muted)">Signal :</span> ${sigBars(n.avg_rssi_dbm, n.signal_quality)} <strong>${n.role === 'leader' ? 'Local' : n.avg_rssi_dbm + ' dBm'}</strong></div>
+          <div><span style="color:var(--muted)">Santé :</span> <strong style="color:${healthColor(n.health_score)}">${n.health_score}%</strong></div>
+          <div><span style="color:var(--muted)">Alim :</span> ${n.battery_pct != null ? `🔋 <strong>${n.battery_pct}%</strong>` : '⚡ Secteur'}</div>
+          <div><span style="color:var(--muted)">État :</span> <span style="color:var(--primary);font-weight:600">${esc(n.matter_state || '—')}</span></div>
+        </div>
+      </div>`;
+  }).join('') || '<div style="text-align:center;color:var(--muted);padding:20px">Aucun appareil trouvé.</div>';
+}
+
+function renderDashboard() {
+  if (!STATE) return;
+  const hs = STATE.mesh_health_score ?? 100;
+  const circ = 301.6;
+  const ring = document.getElementById('healthRing');
+  ring.setAttribute('stroke-dashoffset', (circ * (1 - hs / 100)).toFixed(1));
+  ring.setAttribute('stroke', healthColor(hs));
+  document.getElementById('healthRingTxt').textContent = hs + '%';
+  const warns = (STATE.health_issues || []).filter(i => i.severity !== 'ok').length;
+  document.getElementById('healthRingSub').textContent = warns === 0 ? 'Maillage nominal' : `${warns} point(s) d'attention`;
+
+  document.getElementById('dashAdvisor').innerHTML = (STATE.health_issues || []).map(i => `
+    <span class="pill ${i.severity === 'ok' ? 'ok' : i.severity === 'warn' ? 'warn' : 'crit'}" style="cursor:pointer;padding:5px 10px" onclick="navigate('ota')">
+      ${i.severity === 'crit' ? '🔴' : i.severity === 'warn' ? '🟡' : '🟢'} ${esc(i.title)}
+    </span>`).join('');
+
+  document.getElementById('dashboardGrid').innerHTML = STATE.nodes.map(n => {
+    const [rTxt, rCls] = roleLabel(n.role);
+    const exposes = (n.exposes && n.exposes.length)
+      ? n.exposes.map(e => `<div style="display:flex;justify-content:space-between;padding:5px 0;border-bottom:1px solid var(--border-soft);font-size:0.81rem"><span style="color:var(--text-2)">${esc(e.name)}</span><strong style="color:var(--primary)">${esc(e.value)} ${esc(e.unit)}</strong></div>`).join('')
+      : `<div style="display:flex;justify-content:space-between;padding:5px 0;border-bottom:1px solid var(--border-soft);font-size:0.81rem"><span style="color:var(--text-2)">Statut</span><strong>${esc(n.matter_state || 'Actif')}</strong></div>`;
+    return `
+      <div class="card" style="cursor:pointer" onclick="openDevice('${esc(n.ext_address)}')">
+        <div class="card-hdr">
+          <div class="dev-cell" style="min-width:0">
+            <div class="dev-ico ${esc(n.role)}">${deviceVisualHtml(n)}</div>
+            <div style="min-width:0"><div class="dev-name">${esc(n.friendly_name)}</div><div class="dev-sub">${esc(n.matter_vendor || 'OpenThread')} ${esc(n.matter_product || '')}</div></div>
+          </div>
+          <span class="pill ${rCls}">${rTxt}</span>
+        </div>
+        <div class="card-body">
+          ${exposes}
+          <div style="display:flex;align-items:center;justify-content:space-between;margin-top:9px;padding-top:8px;border-top:1px solid var(--border-soft);font-size:0.75rem;color:var(--muted)">
+            <span>${sigBars(n.avg_rssi_dbm, n.signal_quality)} ${n.role === 'leader' ? 'CH ' + STATE.br.channel : n.avg_rssi_dbm + ' dBm'}${rssiSparkline(n.rssi_history, n.signal_quality, 60, 16)}</span>
+            <strong style="color:${healthColor(n.health_score)}">${n.health_score}%</strong>
+          </div>
+        </div>
+      </div>`;
+  }).join('');
+}
+
+function renderDeviceDetail() {
+  if (!STATE || !SELECTED_EXT) return;
+  const n = STATE.nodes.find(x => x.ext_address === SELECTED_EXT);
+  if (!n) return;
+  const [rTxt, rCls] = roleLabel(n.role);
+
+  document.getElementById('detailTitleWrap').innerHTML = `
+    <div class="dev-ico ${esc(n.role)}">${deviceVisualHtml(n)}</div>
+    <div>
+      <div style="font-weight:800;font-size:1.05rem">${esc(n.friendly_name)}</div>
+      <div style="font-size:0.74rem;color:var(--muted)"><code>${esc(n.ext_address)}</code> · <code>${esc(n.rloc16)}</code></div>
+    </div>
+    <span class="pill ${rCls}">${rTxt}</span>
+    <span class="pill" style="color:${healthColor(n.health_score)}">Santé ${n.health_score}%</span>`;
+
+  const baseTopic = (CFG.mqtt_base_topic || 'thread2mqtt').replace(/\/+$/, '');
+  document.getElementById('detailQuickActions').innerHTML = `
+    ${n.matter_node_id ? `<button class="btn btn-success" onclick="pingMatter(${n.matter_node_id})">📡 Ping Matter</button>` : ''}
+    ${n.matter_node_id ? `<button class="btn" onclick="sendMatterCmd(${n.matter_node_id},'identify')" title="${CFG.read_only_mode ? 'Verrouillé en mode lecture seule' : 'Faire clignoter / biper l\'appareil (Identify 5s)'}">💡 Identifier</button>` : ''}
+    ${n.matter_node_id ? `<button class="btn" onclick="checkOtaNode(${n.matter_node_id})">🔍 Vérifier OTA</button>` : ''}
+    ${n.matter_node_id ? `<button class="btn" onclick="interviewNode(${n.matter_node_id})" title="${CFG.can_interview ? 'Ré-interviewer les clusters Matter' : 'Verrouillé en mode lecture seule'}">🔄 Interview</button>` : ''}
+    <button class="btn" onclick="copyText('${esc(baseTopic)}/node/${esc(n.ext_address)}')">📋 Topic MQTT</button>`;
+
+  document.getElementById('dtCntExp').textContent = (n.exposes || []).length;
+  document.querySelectorAll('#detailTabs button').forEach(b => b.classList.toggle('active', b.getAttribute('data-dtab') === DETAIL_TAB));
+
+  let body = '';
+  if (DETAIL_TAB === 'about') {
+    body = `<div class="grid-2">
+      <table class="kv">
+        <tr><td>Nom convivial</td><td><strong>${esc(n.friendly_name)}</strong></td></tr>
+        <tr><td>MAC IEEE</td><td><code>${esc(n.ext_address)}</code></td></tr>
+        <tr><td>RLOC16 / Parent</td><td><code>${esc(n.rloc16)}</code> ← <code>${esc(n.parent_rloc16 || 'Leader')}</code></td></tr>
+        <tr><td>IPv6 OMR</td><td><code>${esc(n.ipv6_omr || '—')}</code></td></tr>
+        <tr><td>Pièce / Groupe</td><td>${esc(n.group || 'Non assigné')}</td></tr>
+        <tr><td>Description</td><td>${esc(n.description || '—')}</td></tr>
+      </table>
+      <table class="kv">
+        <tr><td>Fabricant / Modèle</td><td><strong>${esc(n.matter_vendor || 'OpenThread')}</strong> · ${esc(n.matter_product || 'Thread Node')}</td></tr>
+        <tr><td>Identité Matter</td><td>${n.matter_node_id ? `Node <strong>#${n.matter_node_id}</strong> (${n.matter_available ? 'En ligne' : 'Hors ligne'})` : 'Transport Thread seul'}</td></tr>
+        <tr><td>Firmware SW / HW</td><td>SW <code>${esc(n.matter_sw_version || '—')}</code> · HW <code>${esc(n.matter_hw_version || '—')}</code></td></tr>
+        <tr><td>Numéro de série</td><td><code>${esc(n.matter_serial || '—')}</code></td></tr>
+        <tr><td>Alimentation</td><td>${n.is_sleepy ? '🔋 Batterie (SED)' : '⚡ Secteur (FTD)'}${n.battery_pct != null ? ` · <strong>${n.battery_pct}%</strong> (${n.battery_mv || '—'} mV ${esc(n.battery_type || '')})` : ''}</td></tr>
+        <tr><td>Topic MQTT</td><td><code>${esc(baseTopic)}/node/${esc(n.ext_address)}</code></td></tr>
+      </table>
+    </div>`;
+  } else if (DETAIL_TAB === 'exposes') {
+    body = (n.exposes && n.exposes.length)
+      ? n.exposes.map(e => `
+        <div class="expose-row">
+          <div><div style="font-weight:700">${esc(e.name)} <span class="pill" style="font-size:0.65rem;padding:0 6px">${esc(e.access)}</span></div>
+          <div style="font-size:0.74rem;color:var(--muted)">Propriété <code>${esc(e.property)}</code> · Cluster ${esc(e.cluster)}</div></div>
+          <div style="display:flex;align-items:center;gap:10px">
+            <div style="font-size:1.05rem;font-weight:800;color:var(--primary)">${esc(e.value)} <span style="font-size:0.8rem;color:var(--text-2)">${esc(e.unit)}</span></div>
+            ${(e.property === 'state' && e.access === 'RW' && n.matter_node_id) ? `<button class="btn btn-sm btn-primary" onclick="sendMatterCmd(${n.matter_node_id},'toggle')" title="${CFG.read_only_mode ? 'Verrouillé en mode lecture seule' : 'Basculer On/Off'}">⚡ Toggle</button>` : ''}
+          </div>
+        </div>`).join('')
+      : `<p style="color:var(--muted);margin:0">Aucun Expose Matter L7 pour ce nœud.</p>`;
+  } else if (DETAIL_TAB === 'radio') {
+    body = `
+      <table class="kv">
+        <tr><td>Qualité &amp; Tendance RSSI</td><td>${sigBars(n.avg_rssi_dbm, n.signal_quality)} <strong>${esc(n.signal_quality.toUpperCase())}</strong> ${rssiSparkline(n.rssi_history, n.signal_quality, 150, 28)}</td></tr>
+        <tr><td>RSSI Moyen / Dernier</td><td><strong>${n.avg_rssi_dbm} dBm</strong> / ${n.last_rssi_dbm} dBm (${(n.rssi_history || []).length} pts historique)</td></tr>
+        <tr><td>LQI In / Out</td><td><strong>${n.lq_in} / ${n.lq_out}</strong> (échelle 0–3)</td></tr>
+        <tr><td>Coût / Âge / Timeout</td><td>Coût ${n.path_cost} · Âge ${n.age_sec}s · Timeout ${n.child_timeout_sec}s</td></tr>
+        <tr><td>Version Thread</td><td>Thread 1.${Math.max(1, n.thread_version - 1)}</td></tr>
+        <tr><td>Service SRP</td><td><code style="word-break:break-all">${esc(n.srp_service || '—')}</code></td></tr>
+        <tr><td>Bail SRP / Sommeil ICD SII</td><td>${n.srp_lease_remaining_s != null ? n.srp_lease_remaining_s + 's' : '—'} · SII ${n.icd_sii_ms != null ? (n.icd_sii_ms / 1000).toFixed(1) + 's' : '—'}</td></tr>
+      </table>`;
+  } else if (DETAIL_TAB === 'clusters') {
+    const cl = (n.matter_clusters || []).map(c => `<span class="pill info" style="margin:2px">${esc(c)}</span>`).join('') || '<span style="color:var(--muted)">Aucun</span>';
+    const fb = (n.fabrics || []).map(f => `<tr><td>#${f.fabric_index}</td><td><strong>${esc(f.label)}</strong></td><td><code>${f.vendor_id}</code></td><td>Node #${f.node_id}</td></tr>`).join('')
+      || '<tr><td colspan="4" style="color:var(--muted)">Aucune fabric Matter</td></tr>';
+    body = `<div style="margin-bottom:14px"><div style="font-size:0.78rem;color:var(--muted);font-weight:700;margin-bottom:6px">Clusters Matter</div><div style="display:flex;flex-wrap:wrap;gap:4px">${cl}</div></div>
+      <div style="font-size:0.78rem;color:var(--muted);font-weight:700;margin-bottom:6px">Fabrics opérationnelles</div>
+      <div class="table-wrap"><table class="z2m"><thead><tr><th>Index</th><th>Contrôleur</th><th>VID</th><th>Node</th></tr></thead><tbody>${fb}</tbody></table></div>`;
+  } else if (DETAIL_TAB === 'state') {
+    body = `<div style="display:flex;justify-content:flex-end;margin-bottom:8px"><button class="btn btn-sm" onclick="copyText(document.getElementById('rawNodeJson').textContent)">📋 Copier JSON</button></div><pre class="term" id="rawNodeJson">${esc(JSON.stringify(n, null, 2))}</pre>`;
+  } else {
+    body = `<div style="max-width:540px;display:grid;gap:12px">
+      <div><label style="display:block;font-size:0.75rem;color:var(--muted);font-weight:700;margin-bottom:4px">Nom convivial (persisté dans state.json)</label><input class="input" id="edName" value="${esc(n.friendly_name)}" /></div>
+      <div><label style="display:block;font-size:0.75rem;color:var(--muted);font-weight:700;margin-bottom:4px">Pièce / Groupe</label><input class="input" id="edGroup" value="${esc(n.group || '')}" placeholder="ex: Sécurité, Étage, Salon" /></div>
+      <div><label style="display:block;font-size:0.75rem;color:var(--muted);font-weight:700;margin-bottom:4px">Description / Notes</label><input class="input" id="edDesc" value="${esc(n.description || '')}" placeholder="ex: Détecteur plafond couloir" /></div>
+      <div><label style="display:block;font-size:0.75rem;color:var(--muted);font-weight:700;margin-bottom:4px">Photo / Icône (fichier <code>device_images/nom.png</code> ou URL HTTPS)</label><input class="input" id="edIcon" value="${esc(n.icon || '')}" placeholder="ex: device_images/heiman_smoke.png" /></div>
+      <div style="display:flex;gap:8px;flex-wrap:wrap">
+        <button class="btn btn-primary" onclick="saveNodeMeta('${esc(n.ext_address)}')">💾 Enregistrer</button>
+        ${n.matter_node_id ? `<button class="btn btn-success" onclick="pingMatter(${n.matter_node_id})">📡 Ping Matter</button>` : ''}
+      </div>
+      <pre class="term" id="pingOut" style="display:none;max-height:140px"></pre>
+    </div>`;
+  }
+  document.getElementById('detailBody').innerHTML = body;
+}
+
+/* Real Join / Commissioning View + QR Camera + Server Bluetooth Check */
+function renderJoinView() {
+  if (!STATE) return;
+  const b = STATE.br;
+  const canJoin = CFG.can_commission && CFG.matter_configured;
+  const btReady = Boolean(STATE.matter_bluetooth_enabled || HW_SCAN?.matter_bluetooth_enabled);
+  const hciList = (HW_SCAN?.bluetooth_adapters || []).map(x => x.name).join(', ');
+  document.getElementById('joinChecks').innerHTML = [
+    { ok: b.state === 'leader' || b.state === 'router', t: 'Thread Border Router', s: `${b.network_name} · CH ${b.channel} (${b.state})` },
+    { ok: b.srp_state === 'running', t: 'Serveur SRP Thread', s: `État : ${b.srp_state}` },
+    { ok: STATE.matter_connected, t: 'Pont Matter Server WS', s: STATE.matter_connected ? `Connecté · SDK ${STATE.matter_sdk_version}` : 'Non connecté' },
+    { ok: btReady, t: 'Bluetooth Serveur (BLE)', s: btReady ? `Prêt (${hciList || 'adapter actif'}) · appairage direct PC` : (hciList ? `${hciList} détecté · activer --bluetooth-adapter dans Paramètres` : 'Non actif — appairage smartphone HA ou clé BLE serveur') },
+    { ok: canJoin, t: 'Autorisation Appairage', s: canJoin ? 'Actif (configuration.yaml)' : 'Verrouillé (read_only_mode: true)' }
+  ].map(c => `
+    <div class="check-box">
+      <span class="pill ${c.ok ? 'ok' : 'warn'}" style="min-width:26px;height:26px;justify-content:center;padding:0;font-size:0.85rem">${c.ok ? '✓' : '!'}</span>
+      <div><div style="font-weight:700;font-size:0.82rem">${esc(c.t)}</div><div style="font-size:0.74rem;color:var(--muted)">${esc(c.s)}</div></div>
+    </div>`).join('');
+
+  const lockPill = document.getElementById('joinLockPill');
+  lockPill.className = 'pill ' + (canJoin ? 'ok' : 'warn');
+  lockPill.textContent = canJoin ? 'Commissioning Actif' : 'Mode Lecture Seule (Prod)';
+  document.getElementById('commissionHint').innerHTML = canJoin
+    ? 'Prêt à appairer via <code>commission_with_code</code> sur Matter Server.'
+    : 'Sécurité prod active : passez <code>read_only_mode: false</code> &amp; <code>allow_commissioning: true</code> dans <code>configuration.yaml</code> pour activer.';
+
+  const mNodes = STATE.nodes.filter(n => n.matter_node_id);
+  document.getElementById('ecwNodeSel').innerHTML = mNodes.map(n =>
+    `<option value="${n.matter_node_id}">#${n.matter_node_id} — ${esc(n.friendly_name)} (${esc(n.matter_vendor || '')})</option>`
+  ).join('') || '<option value="">Aucun appareil Matter lié</option>';
+}
+
+function toggleQrScan() {
+  if (QR_STREAM) stopQrScan();
+  else startQrScan();
+}
+
+async function startQrScan() {
+  const box = document.getElementById('qrScannerBox');
+  const st = document.getElementById('qrStatus');
+  if (!('BarcodeDetector' in window)) {
+    toast('Scanner caméra natif (BarcodeDetector) non supporté par ce navigateur — collez le code MT:... ou utilisez Chrome/Edge/Android.');
+    return;
+  }
+  if (!navigator.mediaDevices?.getUserMedia) {
+    toast('Accès caméra indisponible (HTTPS requis sur réseau local).');
+    return;
+  }
+  try {
+    QR_STREAM = await navigator.mediaDevices.getUserMedia({ video: { facingMode: 'environment' } });
+    const vid = document.getElementById('qrVideo');
+    vid.srcObject = QR_STREAM;
+    box.style.display = 'block';
+    st.textContent = 'Caméra active — pointez le QR Code Matter (MT:...)';
+    const detector = new BarcodeDetector({ formats: ['qr_code'] });
+    const loop = async () => {
+      if (!QR_STREAM) return;
+      try {
+        if (vid.readyState >= 2) {
+          const codes = await detector.detect(vid);
+          for (const c of codes) {
+            const val = (c.rawValue || '').trim();
+            if (val) {
+              document.getElementById('matterCodeIn').value = val;
+              stopQrScan();
+              await decodeMatterLive();
+              toast('QR Code Matter détecté !');
+              return;
+            }
+          }
+        }
+      } catch (_) {}
+      QR_RAF = requestAnimationFrame(loop);
+    };
+    QR_RAF = requestAnimationFrame(loop);
+  } catch (e) {
+    stopQrScan();
+    toast('Caméra refusée ou indisponible : ' + (e?.message || 'vérifiez HTTPS'));
+  }
+}
+
+function stopQrScan() {
+  if (QR_RAF) { cancelAnimationFrame(QR_RAF); QR_RAF = null; }
+  if (QR_STREAM) { QR_STREAM.getTracks().forEach(t => t.stop()); QR_STREAM = null; }
+  const box = document.getElementById('qrScannerBox');
+  if (box) box.style.display = 'none';
+}
+
+async function decodeMatterLive() {
+  const code = (document.getElementById('matterCodeIn')?.value || '').trim();
+  const box = document.getElementById('decodeVisual');
+  if (!box) return;
+  if (!code) { box.innerHTML = ''; return; }
+  const r = await apiFetch('api/decode-matter', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ code }) });
+  const d = await r.json();
+  if (!r.ok || d.error) {
+    box.innerHTML = `<div class="pill crit" style="margin-top:6px">❌ ${esc(d.error || 'Code Matter invalide')}</div>`;
+    return;
+  }
+  box.innerHTML = `<div class="decode-grid">
+    <div class="decode-kv"><div class="dk">Format</div><div class="dv">${esc(d.format || 'Matter')}</div></div>
+    <div class="decode-kv"><div class="dk">Passcode PIN</div><div class="dv">${esc(d.passcode)}</div></div>
+    <div class="decode-kv"><div class="dk">Discriminator</div><div class="dv">${esc(d.discriminator)}</div></div>
+    <div class="decode-kv"><div class="dk">Vendor / Product</div><div class="dv">${esc(d.vendor_id)} / ${esc(d.product_id)}</div></div>
+  </div>`;
+}
+
+async function commissionDevice() {
+  const code = document.getElementById('matterCodeIn').value.trim();
+  const network_only = document.getElementById('chkNetworkOnly').checked;
+  const out = document.getElementById('commissionOut');
+  out.style.display = 'block';
+  out.textContent = 'Envoi de commission_with_code vers python-matter-server...';
+  const r = await apiFetch('api/matter-commission', {
+    method: 'POST', headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ code, network_only })
+  });
+  const txt = await r.text();
+  out.textContent = txt;
+  let d = {}; try { d = JSON.parse(txt); } catch (_) {}
+  if (r.ok && d.error_code == null && !d.error) { toast('Appareil appairé avec succès !'); await loadState(); }
+  else if (r.status === 403) toast('Bloqué : mode lecture seule actif dans configuration.yaml');
+  else toast('Échec appairage Matter : ' + (d.error || d.details || r.status));
+}
+
+async function discoverCommissionable() {
+  const btn = document.getElementById('btnDiscover');
+  const out = document.getElementById('discoverOut');
+  btn.disabled = true; btn.textContent = '⏳ Scan mDNS...';
+  try {
+    const r = await apiFetch('api/matter-discover', { method: 'POST' });
+    const d = await r.json();
+    const list = d.result || [];
+    if (!r.ok || d.error_code != null || d.error) {
+      out.innerHTML = `<span class="pill crit">${esc(d.error || d.details || 'Erreur mDNS')}</span>`;
+    } else if (!list.length) {
+      out.innerHTML = `<span class="pill ok">✅ Scan mDNS terminé — aucun nouvel appareil en mode appairage détecté à proximité.</span>`;
+    } else {
+      out.innerHTML = list.map(x => `<div class="expose-row" style="margin-bottom:6px"><div><strong>${esc(x.device_name || x.instance_name || 'Appareil Matter')}</strong><div class="dev-sub">VID ${esc(x.vendor_id)} · PID ${esc(x.product_id)} · Discriminator ${esc(x.long_discriminator ?? x.discriminator ?? '—')}</div></div><span class="pill info">Prêt à joindre</span></div>`).join('');
+    }
+  } finally {
+    btn.disabled = false; btn.textContent = '🔍 Scanner le réseau';
+  }
+}
+
+async function openMultiAdminEcw() {
+  const nid = parseInt(document.getElementById('ecwNodeSel').value, 10);
+  if (!nid) return;
+  const out = document.getElementById('ecwOut');
+  out.style.display = 'block';
+  out.textContent = `Ouverture fenêtre Multi-Admin ECW (300s) pour Node #${nid}...`;
+  const r = await apiFetch('api/matter-ecw', {
+    method: 'POST', headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ node_id: nid, timeout: 300 })
+  });
+  const txt = await r.text();
+  out.textContent = txt;
+  let d = {}; try { d = JSON.parse(txt); } catch (_) {}
+  if (r.ok && d.error_code == null && !d.error) { startJoinCountdown(300); toast(`Fenêtre Multi-Admin ouverte (300s) pour #${nid}`); }
+  else if (r.status === 403) toast('Bloqué : mode lecture seule (configuration.yaml)');
+  else toast('Échec ECW : ' + (d.error || d.details || r.status));
+}
+
+async function checkOtaNode(nodeId) {
+  toast(`Vérification CSA DCL OTA pour Node #${nodeId}...`);
+  const r = await apiFetch('api/matter-ota-check', {
+    method: 'POST', headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ node_id: nodeId })
+  });
+  const d = await r.json();
+  if (r.ok && d.error_code == null && !d.error) {
+    const res = d.result;
+    OTA_RESULTS[nodeId] = res ? `⬆️ MAJ dispo : ${res.software_version_string || res.software_version || 'Nouvelle version'}` : '✅ Firmware à jour (CSA DCL)';
+    toast(`Node #${nodeId} : ${OTA_RESULTS[nodeId]}`);
+    renderDevAndOta();
+  } else {
+    OTA_RESULTS[nodeId] = `⚠️ ${d.error || d.details || 'Erreur OTA'}`;
+    toast(`OTA #${nodeId} : ${d.error || d.details || 'erreur'}`);
+    renderDevAndOta();
+  }
+}
+
+async function sendMatterCmd(nodeId, action) {
+  if (SANDBOX_MODE) { toast(`Mode Démo : commande '${action}' simulée sur #${nodeId}`); return; }
+  const r = await apiFetch('api/matter-command', {
+    method: 'POST', headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ node_id: nodeId, endpoint_id: 1, action, seconds: 5 })
+  });
+  const d = await r.json().catch(() => ({}));
+  if (r.ok && d.error_code == null && !d.error) { toast(`Commande '${action}' exécutée sur Node #${nodeId}`); await loadState(); }
+  else if (r.status === 403) toast('Bloqué : mode lecture seule (read_only_mode: true)');
+  else toast(`Erreur '${action}' : ${d.error || d.details || r.status}`);
+}
+
+async function interviewNode(nodeId) {
+  const r = await apiFetch('api/matter-interview', {
+    method: 'POST', headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ node_id: nodeId })
+  });
+  const d = await r.json();
+  if (r.ok && d.error_code == null && !d.error) { toast(`Node #${nodeId} ré-interviewé !`); await loadState(); }
+  else toast(d.error || d.details || 'Interview bloquée en lecture seule');
+}
+
+/* Interactive Mesh Map — collision-free outward radial layout */
+function computeDefaultPositions(nodes) {
+  const cx = 430, cy = 285;
+  const leader = nodes.find(n => n.role === 'leader') || nodes[0];
+  const routers = nodes.filter(n => n !== leader && n.role === 'router');
+  const others = nodes.filter(n => n !== leader && n.role !== 'router');
+  if (leader && !NODE_POS[leader.rloc16]) NODE_POS[leader.rloc16] = { x: cx, y: cy };
+  routers.forEach((n, idx) => {
+    if (!NODE_POS[n.rloc16]) {
+      const a = (idx / Math.max(1, routers.length)) * Math.PI * 2 - Math.PI / 5;
+      NODE_POS[n.rloc16] = { x: cx + Math.cos(a) * 195, y: cy + Math.sin(a) * 145 };
+    }
+  });
+  // Group end devices by parent so children fan outward away from center with zero overlap
+  const byParent = {};
+  for (const n of others) {
+    const pk = n.parent_rloc16 || (leader ? leader.rloc16 : '');
+    (byParent[pk] = byParent[pk] || []).push(n);
+  }
+  Object.entries(byParent).forEach(([pk, group], gIdx) => {
+    const p = NODE_POS[pk] || { x: cx, y: cy };
+    const isCenter = Math.hypot(p.x - cx, p.y - cy) < 20;
+    const baseAngle = isCenter ? (-Math.PI * 0.65 + gIdx * 1.1) : Math.atan2(p.y - cy, p.x - cx);
+    group.forEach((n, i) => {
+      if (!NODE_POS[n.rloc16]) {
+        const offset = group.length === 1 ? 0.35 : ((i - (group.length - 1) / 2) * 0.75);
+        const a = baseAngle + offset;
+        const dist = isCenter ? 225 : 165;
+        NODE_POS[n.rloc16] = {
+          x: Math.max(115, Math.min(745, p.x + Math.cos(a) * dist)),
+          y: Math.max(80, Math.min(485, p.y + Math.sin(a) * dist))
+        };
+      }
+    });
+  });
+}
+
+function resetMapLayout() { NODE_POS = {}; MAP_VIEW = { x: 0, y: 0, w: 860, h: 570 }; renderMap(); }
+function zoomMap(f) {
+  const nw = Math.max(260, Math.min(1800, MAP_VIEW.w / f));
+  const nh = nw * (570 / 860);
+  MAP_VIEW.x += (MAP_VIEW.w - nw) / 2; MAP_VIEW.y += (MAP_VIEW.h - nh) / 2;
+  MAP_VIEW.w = nw; MAP_VIEW.h = nh; applyMapViewBox();
+}
+function applyMapViewBox() { const s = document.getElementById('meshSvg'); if (s) s.setAttribute('viewBox', `${MAP_VIEW.x.toFixed(1)} ${MAP_VIEW.y.toFixed(1)} ${MAP_VIEW.w.toFixed(1)} ${MAP_VIEW.h.toFixed(1)}`); }
+function toggleHeatmap() { HEATMAP_MODE = !HEATMAP_MODE; document.getElementById('btnHeat').classList.toggle('btn-primary', HEATMAP_MODE); renderMap(); }
+function exportMapSvg() { const a = document.createElement('a'); a.href = URL.createObjectURL(new Blob([document.getElementById('meshSvg').outerHTML], { type: 'image/svg+xml' })); a.download = `thread2mqtt_mesh_${STATE?.br?.network_name || 'map'}.svg`; a.click(); }
+
+function renderMap() {
+  const svg = document.getElementById('meshSvg');
+  if (!STATE || !STATE.nodes || !svg) return;
+  computeDefaultPositions(STATE.nodes);
+  applyMapViewBox();
+  let html = '<defs><filter id="glow"><feGaussianBlur stdDeviation="2.5" result="b"/><feMerge><feMergeNode in="b"/><feMergeNode in="SourceGraphic"/></feMerge></filter></defs>';
+  if (HEATMAP_MODE) {
+    for (const n of STATE.nodes) {
+      const p = NODE_POS[n.rloc16]; if (!p) continue;
+      const col = n.role === 'leader' ? '#f59e0b' : n.avg_rssi_dbm >= -70 ? '#22c55e' : n.avg_rssi_dbm >= -84 ? '#1d9bf0' : '#ef4444';
+      html += `<circle cx="${p.x}" cy="${p.y}" r="${n.role === 'leader' ? 120 : 88}" fill="${col}" fill-opacity="0.11" stroke="${col}" stroke-opacity="0.28" stroke-dasharray="5 5"/>`;
+    }
+  }
+  for (const l of (STATE.links || [])) {
+    const a = NODE_POS[l.source], b = NODE_POS[l.target]; if (!a || !b) continue;
+    const col = l.quality === 'excellent' ? '#22c55e' : l.quality === 'good' ? '#1d9bf0' : l.quality === 'fair' ? '#f59e0b' : '#ef4444';
+    const mx = (a.x + b.x) / 2, my = (a.y + b.y) / 2;
+    html += `<line x1="${b.x}" y1="${b.y}" x2="${a.x}" y2="${a.y}" stroke="${col}" stroke-width="2.4" stroke-opacity="0.28"/>`;
+    if (ANIM_MESH) {
+      const slow = (l.quality === 'fair' || l.quality === 'weak') ? ' slow' : '';
+      html += `<line x1="${b.x}" y1="${b.y}" x2="${a.x}" y2="${a.y}" stroke="${col}" stroke-width="2.8" stroke-opacity="0.95" class="mesh-flow${slow}" filter="url(#glow)"/>`;
+    } else {
+      html += `<line x1="${b.x}" y1="${b.y}" x2="${a.x}" y2="${a.y}" stroke="${col}" stroke-width="2.6" stroke-opacity="0.82"/>`;
+    }
+    html += `<rect x="${mx - 42}" y="${my - 11}" width="84" height="21" rx="6" fill="#0f141c" stroke="${col}" stroke-opacity="0.78"/>`;
+    html += `<text x="${mx}" y="${my + 3}" text-anchor="middle" fill="${col}" font-size="10" font-weight="700">${l.rssi_dbm} dBm · L${l.lqi}</text>`;
+  }
+  for (const n of STATE.nodes) {
+    const p = NODE_POS[n.rloc16] || { x: 430, y: 285 };
+    const fill = n.role === 'leader' ? '#f59e0b' : n.role === 'router' ? '#1d9bf0' : n.role === 'sed' ? '#a78bfa' : '#22c55e';
+    const r = n.role === 'leader' ? 28 : n.role === 'router' ? 22 : 19;
+    const stroke = n.ext_address === SELECTED_EXT ? '#ffffff' : '#0f141c';
+    html += `<g data-rloc="${esc(n.rloc16)}" data-ext="${esc(n.ext_address)}" style="cursor:grab">`;
+    if (n.role === 'leader') html += `<circle cx="${p.x}" cy="${p.y}" r="28" fill="none" stroke="#f59e0b" stroke-width="2" class="leader-pulse"/>`;
+    html += `<circle cx="${p.x}" cy="${p.y}" r="${r}" fill="${fill}" stroke="${stroke}" stroke-width="3" filter="url(#glow)"/>`;
+    html += `<text x="${p.x}" y="${p.y + 4}" text-anchor="middle" fill="#090e16" font-size="10" font-weight="800">${esc(n.rloc16.replace('0x', ''))}</text>`;
+    if (n.battery_pct != null) {
+      html += `<rect x="${p.x + r - 8}" y="${p.y - r - 7}" width="34" height="15" rx="4" fill="#0f141c" stroke="#22c55e"/>`;
+      html += `<text x="${p.x + r + 9}" y="${p.y - r + 4}" text-anchor="middle" fill="#22c55e" font-size="9" font-weight="700">${n.battery_pct}%</text>`;
+    }
+    html += `<text x="${p.x}" y="${p.y + r + 17}" text-anchor="middle" fill="currentColor" font-size="11.5" font-weight="700">${esc(n.friendly_name.slice(0, 28))}</text>`;
+    if (n.matter_state) html += `<text x="${p.x}" y="${p.y + r + 31}" text-anchor="middle" fill="#38bdf8" font-size="9.5" font-weight="600">${esc(n.matter_state.slice(0, 32))}</text>`;
+    html += `</g>`;
+  }
+  svg.innerHTML = html;
+}
+
+function renderMapSidePanel() {
+  if (!STATE || !SELECTED_EXT) return;
+  const n = STATE.nodes.find(x => x.ext_address === SELECTED_EXT);
+  if (!n) return;
+  const [rTxt, rCls] = roleLabel(n.role);
+  document.getElementById('mapSideTitle').textContent = n.friendly_name;
+  document.getElementById('mapOpenFullBtn').style.display = 'inline-flex';
+  document.getElementById('mapInspector').innerHTML = `
+    <div style="display:flex;gap:6px;flex-wrap:wrap;margin-bottom:10px">
+      <span class="pill ${rCls}">${rTxt}</span><code>${esc(n.rloc16)}</code>
+      <span class="pill" style="color:${healthColor(n.health_score)}">${n.health_score}%</span>
+    </div>
+    <table class="kv" style="margin-bottom:10px">
+      <tr><td>MAC IEEE</td><td><code>${esc(n.ext_address)}</code></td></tr>
+      <tr><td>Signal</td><td>${sigBars(n.avg_rssi_dbm, n.signal_quality)} ${n.role === 'leader' ? 'Local' : n.avg_rssi_dbm + ' dBm'} ${rssiSparkline(n.rssi_history, n.signal_quality, 62, 16)}</td></tr>
+      <tr><td>Batterie</td><td>${n.battery_pct != null ? `🔋 ${n.battery_pct}% (${n.battery_mv || '—'} mV)` : '⚡ Secteur'}</td></tr>
+      <tr><td>Matter L7</td><td>${esc(n.matter_state || 'Thread seul')}</td></tr>
+      <tr><td>IPv6 OMR</td><td><code style="word-break:break-all">${esc(n.ipv6_omr || '—')}</code></td></tr>
+    </table>
+    <div style="display:flex;gap:6px;flex-wrap:wrap">
+      ${n.matter_node_id ? `<button class="btn btn-sm btn-success" onclick="pingMatter(${n.matter_node_id})">📡 Ping</button>` : ''}
+      <button class="btn btn-sm" onclick="openDevice('${esc(n.ext_address)}','exposes')">⚡ Exposes</button>
+      <button class="btn btn-sm" onclick="openDevice('${esc(n.ext_address)}','settings')">✏️ Éditer</button>
+    </div>`;
+}
+
+function svgPoint(svg, cx, cy) {
+  const r = svg.getBoundingClientRect();
+  return { x: MAP_VIEW.x + ((cx - r.left) / Math.max(1, r.width)) * MAP_VIEW.w, y: MAP_VIEW.y + ((cy - r.top) / Math.max(1, r.height)) * MAP_VIEW.h };
+}
+function initMapEvents() {
+  const svg = document.getElementById('meshSvg');
+  svg.addEventListener('wheel', ev => { ev.preventDefault(); zoomMap(ev.deltaY < 0 ? 1.12 : 0.89); }, { passive: false });
+  svg.addEventListener('pointerdown', ev => {
+    svg.setPointerCapture(ev.pointerId);
+    const g = ev.target.closest('g[data-rloc]');
+    if (g) DRAG_NODE = { rloc: g.getAttribute('data-rloc'), ext: g.getAttribute('data-ext'), moved: false };
+    else PAN_STATE = { sx: ev.clientX, sy: ev.clientY, vx: MAP_VIEW.x, vy: MAP_VIEW.y };
+  });
+  svg.addEventListener('pointermove', ev => {
+    if (DRAG_NODE) { const pt = svgPoint(svg, ev.clientX, ev.clientY); NODE_POS[DRAG_NODE.rloc] = { x: pt.x, y: pt.y }; DRAG_NODE.moved = true; renderMap(); }
+    else if (PAN_STATE) {
+      const r = svg.getBoundingClientRect();
+      MAP_VIEW.x = PAN_STATE.vx - (ev.clientX - PAN_STATE.sx) * (MAP_VIEW.w / Math.max(1, r.width));
+      MAP_VIEW.y = PAN_STATE.vy - (ev.clientY - PAN_STATE.sy) * (MAP_VIEW.h / Math.max(1, r.height));
+      applyMapViewBox();
+    }
+  });
+  svg.addEventListener('pointerup', () => {
+    if (DRAG_NODE && !DRAG_NODE.moved) { SELECTED_EXT = DRAG_NODE.ext; renderMap(); renderMapSidePanel(); }
+    DRAG_NODE = null; PAN_STATE = null;
+  });
+}
+
+/* Spectrum, Matter, OTA, Dev, Settings */
+function renderSpectrum() {
+  const svg = document.getElementById('spectrumSvg');
+  if (!STATE || !svg) return;
+  const activeCh = STATE.br.channel || 25, zCh = STATE.zigbee_channel, scanMap = {};
+  for (const s of (STATE.energy_scan || [])) scanMap[s.channel] = s.max_rssi_dbm;
+  let html = '';
+  for (const w of [
+    { label: 'Wi-Fi Ch 1 (2412 MHz)', x1: 42, x2: 262, col: 'rgba(239,68,68,0.10)', stroke: 'rgba(239,68,68,0.35)' },
+    { label: 'Wi-Fi Ch 6 (2437 MHz)', x1: 317, x2: 537, col: 'rgba(245,158,11,0.10)', stroke: 'rgba(245,158,11,0.35)' },
+    { label: 'Wi-Fi Ch 11 (2462 MHz)', x1: 592, x2: 812, col: 'rgba(239,68,68,0.10)', stroke: 'rgba(239,68,68,0.35)' }
+  ]) {
+    html += `<rect x="${w.x1}" y="28" width="${w.x2 - w.x1}" height="188" rx="10" fill="${w.col}" stroke="${w.stroke}" stroke-dasharray="4 4"/>`;
+    html += `<text x="${(w.x1 + w.x2) / 2}" y="20" text-anchor="middle" fill="#94a3b8" font-size="10.5" font-weight="600">${w.label}</text>`;
+  }
+  for (let i = 0; i < 16; i++) {
+    const ch = 11 + i, x = 48 + i * 55, rssi = scanMap[ch] !== undefined ? scanMap[ch] : -92;
+    const norm = Math.max(10, Math.min(165, ((rssi + 105) / 65) * 165)), y = 216 - norm;
+    const isThread = ch === activeCh, isZigbee = zCh && ch === zCh;
+    const barCol = isThread ? '#1d9bf0' : isZigbee ? '#f59e0b' : rssi > -72 ? '#ef4444' : '#22c55e';
+    html += `<rect x="${x}" y="${y.toFixed(1)}" width="34" height="${norm.toFixed(1)}" rx="5" fill="${barCol}" fill-opacity="${isThread || isZigbee ? '0.92' : '0.52'}" stroke="${barCol}"/>`;
+    if (scanMap[ch] !== undefined) html += `<text x="${x + 17}" y="${(y - 5).toFixed(1)}" text-anchor="middle" fill="${barCol}" font-size="9.5" font-weight="700">${rssi}</text>`;
+    html += `<text x="${x + 17}" y="235" text-anchor="middle" fill="currentColor" font-size="11" font-weight="${isThread || isZigbee ? '800' : '500'}">${ch}</text>`;
+    if (isThread) html += `<text x="${x + 17}" y="253" text-anchor="middle" fill="#1d9bf0" font-size="9.5" font-weight="800">THREAD</text>`;
+    if (isZigbee) html += `<text x="${x + 17}" y="253" text-anchor="middle" fill="#f59e0b" font-size="9.5" font-weight="800">ZIGBEE</text>`;
+  }
+  svg.innerHTML = html;
+
+  const mc = STATE.mac_counters || {}, ackPct = mc.ack_rate_pct ?? 100;
+  document.getElementById('macTable').innerHTML = [
+    ['TX Total / Unicast / Broadcast', `${mc.tx_total || 0} / ${mc.tx_unicast || 0} / ${mc.tx_broadcast || 0}`],
+    ['Taux MAC ACK', `<span class="bar-track"><i style="width:${ackPct}%;background:${healthColor(ackPct)}"></i></span><strong>${ackPct.toFixed(2)}%</strong> (${mc.tx_acked || 0}/${mc.tx_ack_requested || 0})`],
+    ['Erreurs CCA / Canal occupé', `${mc.tx_err_cca || 0} / ${mc.tx_err_busy_channel || 0}`],
+    ['Expirations retries Direct / Indirect', `${mc.tx_direct_max_retry_expiry || 0} / <strong style="color:${(mc.tx_indirect_max_retry_expiry || 0) > 50 ? 'var(--amber)' : 'var(--green)'}">${mc.tx_indirect_max_retry_expiry || 0}</strong>`],
+    ['RX Total / Polls SED', `${mc.rx_total || 0} / ${mc.rx_data_poll || 0}`],
+    ['RX Dupliqués / FCS / Sécurité', `${mc.rx_duplicated || 0} / ${mc.rx_err_fcs || 0} / ${mc.rx_err_sec || 0}`]
+  ].map(([k, v]) => `<tr><td>${k}</td><td>${v}</td></tr>`).join('');
+
+  const ic = STATE.ip_counters || {}, delPct = ic.delivery_rate_pct ?? 100;
+  document.getElementById('ipTable').innerHTML = [
+    ['Livraison IPv6', `<span class="bar-track"><i style="width:${delPct}%;background:var(--green)"></i></span><strong style="color:var(--green)">${delPct.toFixed(2)}%</strong>`],
+    ['IPv6 TX Succès / Échecs', `${ic.tx_success || 0} / ${ic.tx_failed || 0}`],
+    ['IPv6 RX Succès / Échecs', `${ic.rx_success || 0} / ${ic.rx_failed || 0}`],
+    ['Canal RF Thread', `Canal ${STATE.br.channel} (${2405 + (STATE.br.channel - 11) * 5} MHz)`],
+    ['Écart orthogonal Zigbee', zCh ? `Zigbee CH ${zCh} · <strong>${Math.abs(STATE.br.channel - zCh) * 5} MHz</strong>` : 'Non configuré']
+  ].map(([k, v]) => `<tr><td>${k}</td><td>${v}</td></tr>`).join('');
+}
+
+async function runEnergyScan() {
+  const btn = document.getElementById('btnScan');
+  btn.disabled = true; btn.textContent = '⏳ Scan 16 canaux...';
+  try {
+    const r = await apiFetch('api/energy-scan', { method: 'POST' });
+    const d = await r.json();
+    if (d.channels && STATE) { STATE.energy_scan = d.channels; renderSpectrum(); toast(`Scan RF terminé (${d.channels.length} canaux)`); }
+    else toast(d.error || 'Échec scan RF');
+  } finally { btn.disabled = false; btn.textContent = '⚡ Scanner l\'énergie RF'; }
+}
+
+function renderMatterAndGroups() {
+  if (!STATE) return;
+  document.getElementById('matterSdkPill').textContent = STATE.matter_connected ? `SDK ${STATE.matter_sdk_version} · Fabric ${STATE.matter_fabric_id}` : 'Matter WS veille';
+  const mNodes = STATE.nodes.filter(n => n.matter_node_id);
+  document.getElementById('cntMatter').textContent = mNodes.length;
+  document.getElementById('matterTbody').innerHTML = mNodes.map(n => `
+    <tr onclick="openDevice('${esc(n.ext_address)}')">
+      <td><strong>#${n.matter_node_id}</strong></td>
+      <td><strong>${esc(n.friendly_name)}</strong></td>
+      <td>${esc(n.matter_vendor)} · ${esc(n.matter_product)}</td>
+      <td>SW <code>${esc(n.matter_sw_version || '—')}</code><div class="dev-sub"><code>${esc(n.matter_serial || '—')}</code></div></td>
+      <td>${n.battery_pct != null ? `🔋 ${n.battery_pct}% (${n.battery_mv || '—'} mV)` : '⚡ Secteur'}</td>
+      <td><code>${esc(n.rloc16)}</code><div class="dev-sub"><code>${esc(n.ipv6_omr || '—')}</code></div></td>
+      <td>${(n.fabrics || []).map(f => `<span class="pill">${esc(f.label)}</span>`).join(' ') || '—'}</td>
+      <td><span class="pill info">${esc(n.matter_state || '—')}</span></td>
+      <td onclick="event.stopPropagation()" style="white-space:nowrap">
+        <button class="btn btn-sm btn-success" onclick="pingMatter(${n.matter_node_id})">📡</button>
+        <button class="btn btn-sm" onclick="checkOtaNode(${n.matter_node_id})" title="Vérifier MAJ OTA">🔍 OTA</button>
+      </td>
+    </tr>`).join('') || '<tr><td colspan="9" style="text-align:center;color:var(--muted);padding:18px">Aucun nœud Matter corrélé.</td></tr>';
+
+  const byGrp = {};
+  for (const n of STATE.nodes) (byGrp[n.group || 'Non assigné'] = byGrp[n.group || 'Non assigné'] || []).push(n);
+  document.getElementById('groupsBox').innerHTML = `<div class="table-wrap"><table class="z2m"><thead><tr><th>Groupe</th><th>Appareils</th><th>Santé</th></tr></thead><tbody>` +
+    Object.entries(byGrp).map(([g, l]) => `<tr><td><strong>${esc(g)}</strong></td><td>${l.map(x => esc(x.friendly_name)).join(', ')}</td><td><strong style="color:${healthColor(Math.round(l.reduce((a, b) => a + b.health_score, 0) / l.length))}">${Math.round(l.reduce((a, b) => a + b.health_score, 0) / l.length)}%</strong></td></tr>`).join('') + `</tbody></table></div>`;
+
+  const fabMap = {};
+  for (const n of mNodes) for (const f of (n.fabrics || [])) {
+    const k = `${f.vendor_id}:${f.label}`;
+    (fabMap[k] = fabMap[k] || { label: f.label, vid: f.vendor_id, nodes: [] }).nodes.push(`#${n.matter_node_id} ${n.friendly_name}`);
+  }
+  const fEntries = Object.values(fabMap);
+  document.getElementById('fabricsBox').innerHTML = fEntries.length
+    ? `<div class="table-wrap"><table class="z2m"><thead><tr><th>Contrôleur</th><th>VID</th><th>Nœuds</th></tr></thead><tbody>` + fEntries.map(f => `<tr><td><strong>${esc(f.label)}</strong></td><td><code>${f.vid}</code></td><td>${esc(f.nodes.join(', '))}</td></tr>`).join('') + `</tbody></table></div>`
+    : '<p style="color:var(--muted);margin:0">Aucune fabric Matter détectée.</p>';
+}
+
+function renderDevAndOta() {
+  if (!STATE) return;
+  document.getElementById('ipv6Pre').textContent = `Préfixe OMR : ${STATE.br.omr_prefix || '—'}\nMesh-Local  : ${STATE.br.mesh_local_prefix}\n` + (STATE.br.ipaddrs || []).map(a => `  • ${a}`).join('\n');
+  document.getElementById('srpTbody').innerHTML = (STATE.srp_services || []).map(s => `
+    <tr><td>${s.matter_node_id ? `<strong>#${s.matter_node_id}</strong>` : '—'}</td><td><code>${esc(s.ext_address)}</code></td><td><code>${esc(s.ipv6_omr)}</code></td><td>${s.lease_remaining_s}s</td><td>${s.icd_sii_ms ? (s.icd_sii_ms / 1000).toFixed(1) + 's' : '—'} / ${s.icd_sai_ms ? (s.icd_sai_ms / 1000).toFixed(1) + 's' : '—'}</td></tr>`).join('') || '<tr><td colspan="5" style="color:var(--muted)">Aucun service SRP</td></tr>';
+
+  const issues = STATE.health_issues || [];
+  document.getElementById('cntIssues').textContent = issues.filter(i => i.severity !== 'ok').length;
+  document.getElementById('advisorFull').innerHTML = issues.map(i => `
+    <div class="pill ${i.severity === 'ok' ? 'ok' : i.severity === 'warn' ? 'warn' : 'crit'}" style="display:block;border-radius:9px;padding:11px 14px;margin-bottom:9px;font-weight:400;white-space:normal">
+      <div style="font-weight:700">[${esc(i.category)}] ${esc(i.title)}</div>
+      <div style="font-size:0.81rem;margin-top:4px;color:var(--text)">${esc(i.detail)}</div>
+      <div style="font-size:0.78rem;margin-top:4px;color:var(--text-2)">💡 ${esc(i.recommendation)}</div>
+    </div>`).join('');
+
+  document.getElementById('otaTbody').innerHTML = STATE.nodes.map(n => `
+    <tr onclick="openDevice('${esc(n.ext_address)}')">
+      <td><strong>${esc(n.friendly_name)}</strong></td>
+      <td>${esc(n.matter_vendor || 'OpenThread')} · ${esc(n.matter_product || 'Thread')}</td>
+      <td>Thread 1.${Math.max(1, n.thread_version - 1)}</td>
+      <td>SW <code>${esc(n.matter_sw_version || '—')}</code> / HW <code>${esc(n.matter_hw_version || '—')}</code></td>
+      <td>${n.battery_pct != null ? `🔋 ${n.battery_pct}% (${n.battery_mv ? (n.battery_mv / 1000).toFixed(2) + 'V' : ''})` : '⚡ Secteur'}</td>
+      <td><span class="pill ${n.matter_available ? 'ok' : 'crit'}">${n.matter_available ? 'En ligne' : 'Hors ligne'}</span></td>
+      <td onclick="event.stopPropagation()">
+        ${n.matter_node_id ? `<button class="btn btn-sm" onclick="checkOtaNode(${n.matter_node_id})">🔍 Vérifier DCL</button> <span style="font-size:0.75rem;margin-left:5px">${esc(OTA_RESULTS[n.matter_node_id] || '')}</span>` : '<span style="color:var(--muted)">—</span>'}
+      </td>
+    </tr>`).join('');
+}
+
+function renderBrVault() {
+  if (!STATE) return;
+  const b = STATE.br;
+  document.getElementById('brTable').innerHTML = [
+    ['Source de données', STATE.otbr_source],
+    ['Rôle / État', b.state],
+    ['Nom du réseau', b.network_name],
+    ['Canal RF (802.15.4)', `Canal ${b.channel} (${2405 + (b.channel - 11) * 5} MHz)`],
+    ['PAN ID / ExtPAN ID', `${b.pan_id} / ${b.ext_pan_id}`],
+    ['Mesh-Local / Préfixe OMR', `${b.mesh_local_prefix} · ${b.omr_prefix || '—'}`],
+    ['RLOC16 / Adresse étendue', `${b.rloc16} / ${b.ext_address}`],
+    ['Partition ID / Leader Weight', `${b.partition_id} / ${b.leader_weight}`],
+    ['SRP Server / Border Router', `${b.srp_state} / ${b.br_state}`],
+    ['Network Key (Masquée)', b.network_key_masked],
+    ['PSKc (Masquée)', b.pskc_masked]
+  ].map(([k, v]) => `<tr><td>${esc(k)}</td><td><code>${esc(v)}</code></td></tr>`).join('');
+}
+
+async function runHardwareScan(silent) {
+  const btn = document.getElementById('btnHwScan');
+  if (btn && !silent) { btn.disabled = true; btn.textContent = '⏳ Scan matériel...'; }
+  try {
+    const r = await apiFetch('api/hardware/scan');
+    if (!r.ok) return;
+    HW_SCAN = await r.json();
+    const sel = document.getElementById('yBt');
+    if (sel && HW_SCAN.bluetooth_adapters && HW_SCAN.bluetooth_adapters.length) {
+      const existing = new Set([...sel.options].map(o => o.value));
+      for (const a of HW_SCAN.bluetooth_adapters) {
+        if (!existing.has(String(a.index))) {
+          const opt = document.createElement('option');
+          opt.value = String(a.index);
+          opt.textContent = `${a.name} — Adaptateur Bluetooth serveur #${a.index} (détecté)`;
+          sel.appendChild(opt);
+        }
+      }
+      if (sel.value === 'none') sel.value = String(HW_SCAN.bluetooth_adapters[0].index);
+    }
+    const chips = [];
+    for (const a of (HW_SCAN.bluetooth_adapters || [])) chips.push(`<span class="pill ok">🔵 Bluetooth ${esc(a.name)} (${esc(a.status)})</span>`);
+    if (!(HW_SCAN.bluetooth_adapters || []).length) chips.push('<span class="pill warn">🔵 Aucun adaptateur Bluetooth /sys/class/bluetooth détecté</span>');
+    for (const s of (HW_SCAN.serial_devices || [])) chips.push(`<span class="pill info">🔌 USB ${esc(s.name)}</span>`);
+    for (const sv of (HW_SCAN.local_services || [])) chips.push(`<span class="pill ${sv.reachable ? 'ok' : 'crit'}">${sv.reachable ? '🟢' : '⚪'} ${esc(sv.name)} (${esc(sv.endpoint)})</span>`);
+    const out = document.getElementById('hwScanOut');
+    if (out) out.innerHTML = chips.join('');
+    rebuildYamlGenerator();
+    if (CURRENT_VIEW === 'join') renderJoinView();
+    if (!silent) toast('Détection matérielle locale terminée');
+  } finally {
+    if (btn && !silent) { btn.disabled = false; btn.textContent = '🔍 Détecter matériel (USB / Bluetooth / Ports)'; }
+  }
+}
+
+function rebuildYamlGenerator() {
+  const ro = document.getElementById('yRo').checked;
+  const comm = document.getElementById('yComm').checked;
+  const mqtt = document.getElementById('yMqtt').checked;
+  const auth = document.getElementById('yAuth').checked;
+  const btVal = document.getElementById('yBt')?.value || 'none';
+  const zch = STATE?.zigbee_channel || 11;
+  const yaml = `# Thread2MQTT v0.5 — configuration.yaml
+frontend:
+  bind: "127.0.0.1:8099"
+  default_theme: "${document.body.classList.contains('light') ? 'light' : 'dark'}"${auth ? '\n  auth_token: "${THREAD2MQTT_AUTH_TOKEN}"' : '\n  # auth_token: "${THREAD2MQTT_AUTH_TOKEN}"'}
+
+thread:
+  otbr_rest_url: "http://127.0.0.1:8081"
+  otctl_cmd: "docker exec matter-otbr ot-ctl"
+  poll_interval_secs: 15
+  zigbee_channel: ${zch}
+
+matter:
+  ws_url: "ws://127.0.0.1:5580/ws"
+  allow_commissioning: ${comm}
+  allow_interview: true
+  allow_ota_check: true
+
+mqtt:
+  enabled: ${mqtt}
+  server: "127.0.0.1:1883"
+  user: "\${MQTT_USER}"
+  password: "\${MQTT_PASS}"
+  base_topic: "thread2mqtt"
+  homeassistant_discovery: true
+  discovery_prefix: "homeassistant"
+
+advanced:
+  read_only_mode: ${ro}
+  demo_mode: false
+  data_dir: "/data"
+  rssi_history_points: 60`;
+  document.getElementById('yamlPreview').textContent = yaml;
+  document.getElementById('activeYamlPre').textContent = CFG.sanitized_yaml || yaml;
+
+  const btWrap = document.getElementById('btComposeWrap');
+  const btPre = document.getElementById('btComposePre');
+  if (btWrap && btPre) {
+    if (btVal !== 'none') {
+      btWrap.style.display = 'block';
+      btPre.textContent = `# Ajoutez ces 3 lignes au service matter-server pour l'appairage BLE direct depuis le serveur (hci${btVal}) :
+services:
+  matter-server:
+    image: ghcr.io/home-assistant-libs/python-matter-server:stable
+    network_mode: host
+    command: --storage-path /data --bluetooth-adapter ${btVal}
+    volumes:
+      - ./matter_data:/data
+      - /run/dbus:/run/dbus:ro`;
+    } else {
+      btWrap.style.display = 'none';
+    }
+  }
+}
+
+async function quickRename(ext, currentName) {
+  const next = prompt('Nouveau nom convivial (persisté dans state.json) :', currentName);
+  if (!next || next.trim() === '' || next.trim() === currentName) return;
+  if (SANDBOX_MODE) {
+    const n = STATE.nodes.find(x => x.ext_address === ext);
+    if (n) n.friendly_name = next.trim();
+    renderAll(); toast('Renommé en mode Démo'); return;
+  }
+  const r = await apiFetch('api/rename', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ ext_address: ext, friendly_name: next.trim() }) });
+  if (r.ok) { toast('Appareil renommé'); await loadState(); }
+  else toast('Échec renommage');
+}
+
+function downloadYamlConfig() {
+  const txt = document.getElementById('yamlPreview').textContent;
+  const a = document.createElement('a');
+  a.href = URL.createObjectURL(new Blob([txt], { type: 'text/yaml' }));
+  a.download = 'configuration.yaml';
+  a.click();
+  toast('configuration.yaml téléchargé');
+}
+
+async function saveNodeMeta(ext) {
+  const friendly_name = document.getElementById('edName').value;
+  const group = document.getElementById('edGroup').value;
+  const description = document.getElementById('edDesc').value;
+  const icon = document.getElementById('edIcon')?.value || '';
+  if (SANDBOX_MODE) {
+    const n = STATE.nodes.find(x => x.ext_address === ext);
+    if (n) { n.friendly_name = friendly_name || n.friendly_name; n.group = group || null; n.description = description || null; n.icon = icon || null; }
+    renderAll(); toast('Mis à jour en mode Démo'); return;
+  }
+  const r = await apiFetch('api/node-meta', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ ext_address: ext, friendly_name, group, description, icon }) });
+  const d = await r.json().catch(() => ({}));
+  if (r.ok) { toast(d.persisted ? 'Enregistré dans state.json' : 'Mis à jour en mémoire (data_dir non configuré)'); await loadState(); }
+  else toast('Échec sauvegarde');
+}
+
+async function pingMatter(nodeId) {
+  toast(`Ping Matter #${nodeId}...`);
+  const r = await apiFetch('api/matter-ping', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ node_id: nodeId }) });
+  const txt = await r.text();
+  let d = {}; try { d = JSON.parse(txt); } catch (_) {}
+  const box = document.getElementById('pingOut');
+  if (box) { box.style.display = 'block'; box.textContent = txt; }
+  toast((r.ok && d.error_code == null && !d.error) ? `Matter Ping #${nodeId} OK !` : `Erreur Ping #${nodeId}`);
+}
+
+async function runOtctl(cmd) {
+  const out = document.getElementById('otctlOut');
+  out.textContent = `$ ot-ctl ${cmd}\nExécution...`;
+  const r = await apiFetch('api/otctl', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ command: cmd }) });
+  const d = await r.json();
+  out.textContent = `$ ot-ctl ${cmd}\n\n` + (d.output || d.error || 'Vide');
+}
+
+async function loadDiscovery() {
+  const r = await apiFetch('api/discovery');
+  const d = await r.json();
+  DISCO_ITEMS = d.items || [];
+  document.getElementById('discoCount').textContent = `(${d.count} entités)`;
+  renderDiscovery();
+}
+function renderDiscovery() {
+  const q = (document.getElementById('discoSearch').value || '').toLowerCase();
+  FILTERED_DISCO = DISCO_ITEMS.filter(x => x.topic.toLowerCase().includes(q) || JSON.stringify(x.payload).toLowerCase().includes(q));
+  document.getElementById('discoList').innerHTML = FILTERED_DISCO.map((it, idx) => `
+    <div style="border:1px solid var(--border);border-radius:8px;padding:10px;margin-bottom:8px;background:var(--surface-2)">
+      <div style="display:flex;justify-content:space-between;align-items:center;gap:8px;margin-bottom:6px;flex-wrap:wrap">
+        <code style="color:var(--primary)">${esc(it.topic)}</code>
+        <button class="btn btn-sm" onclick="copyText(JSON.stringify(FILTERED_DISCO[${idx}].payload, null, 2))">📋 Copier</button>
+      </div>
+      <pre class="term" style="max-height:130px">${esc(JSON.stringify(it.payload, null, 2))}</pre>
+    </div>`).join('') || '<p style="color:var(--muted)">Aucun topic.</p>';
+}
+async function loadMetricsPreview() { const r = await apiFetch('metrics'); document.getElementById('metricsPre').textContent = await r.text(); }
+function copyText(txt) { navigator.clipboard?.writeText(txt).then(() => toast('Copié !')); }
+async function pollNow() { if (!SANDBOX_MODE) await apiFetch('api/poll-now', { method: 'POST' }); await loadState(); toast('Télémétrie OTBR + Matter actualisée'); }
+async function downloadBackup() {
+  const r = await apiFetch('api/backup');
+  const a = document.createElement('a');
+  a.href = URL.createObjectURL(new Blob([await r.text()], { type: 'application/json' }));
+  a.download = `thread2mqtt_backup_${STATE?.br?.network_name || 'mesh'}_${Math.floor(Date.now() / 1000)}.json`;
+  a.click(); toast('Backup JSON Zero-Trust téléchargé');
+}
+
+async function toggleSandbox() {
+  SANDBOX_MODE = !SANDBOX_MODE; NODE_POS = {}; SELECTED_EXT = null;
+  document.getElementById('btnSandbox').textContent = SANDBOX_MODE ? '📡 Retour Live' : '🧪 Démo';
+  document.getElementById('btnSandbox').classList.toggle('btn-warn', SANDBOX_MODE);
+  if (SANDBOX_MODE) { const r = await apiFetch('api/demo-state'); STATE = await r.json(); renderAll(); toast('Bac à sable 6 nœuds actif'); }
+  else { await loadState(); toast('Retour sur le Border Router live'); }
+}
+
+function toggleLogPause() { LOG_PAUSED = !LOG_PAUSED; document.getElementById('btnPauseLog').textContent = LOG_PAUSED ? '▶️ Reprendre' : '⏸ Pause'; }
+function appendLog(e) { if (LOG_PAUSED) return; if (LOG_BUFFER.some(x => x.seq === e.seq && x.ts === e.ts)) return; LOG_BUFFER.unshift(e); if (LOG_BUFFER.length > 300) LOG_BUFFER.pop(); renderLogs(); }
+function renderLogs() {
+  const lvl = document.getElementById('logLevel').value, src = document.getElementById('logSrc').value, q = (document.getElementById('logSearch').value || '').toLowerCase();
+  const list = LOG_BUFFER.filter(e => (lvl === 'ALL' || e.level === lvl) && (src === 'ALL' || e.source === src) && (!q || JSON.stringify(e).toLowerCase().includes(q)));
+  document.getElementById('logBox').innerHTML = list.map(e => {
+    const ts = new Date((e.ts || 0) * 1000).toTimeString().slice(0, 8);
+    const col = e.level === 'WARN' ? '#f59e0b' : e.level === 'TX' ? '#38bdf8' : '#22c55e';
+    return `<div class="log-line"><span style="color:#64748b">${ts}</span><span style="color:${col};font-weight:700">${esc(e.level)}</span><span class="log-src" style="color:#a78bfa">${esc(e.source)}</span><span style="word-break:break-word">${esc(e.summary)} <code style="background:transparent;border:none;color:#94a3b8">${esc(e.payload)}</code></span></div>`;
+  }).join('') || '<div style="color:#64748b;padding:12px">En attente d\'événements SSE...</div>';
+}
+function exportLogs() { const a = document.createElement('a'); a.href = URL.createObjectURL(new Blob([LOG_BUFFER.map(e => JSON.stringify(e)).join('\n')], { type: 'application/x-ndjson' })); a.download = `thread2mqtt_logs_${Math.floor(Date.now() / 1000)}.jsonl`; a.click(); }
+
+function renderAll() {
+  if (!STATE) return;
+  const b = STATE.br, hs = STATE.mesh_health_score ?? 100;
+  const mCount = STATE.nodes.filter(n => n.matter_node_id).length;
+  const bats = STATE.nodes.map(n => n.battery_pct).filter(v => v != null);
+  const minBat = bats.length ? Math.min(...bats) : null;
+
+  document.getElementById('sbNetName').textContent = b.network_name || 'Thread';
+  document.getElementById('sbCh').textContent = `CH ${b.channel}`;
+  document.getElementById('sbHealthTxt').textContent = `Santé ${hs}%`;
+  document.getElementById('sbMatterTxt').textContent = STATE.matter_connected ? `Matter ${mCount}` : 'Thread';
+  document.getElementById('hdrMode').style.display = (STATE.demo_mode || SANDBOX_MODE) ? 'inline-flex' : 'none';
+  document.getElementById('cntNodes').textContent = STATE.nodes.length;
+
+  document.getElementById('kNet').textContent = b.network_name;
+  document.getElementById('kPan').textContent = `CH ${b.channel} · PAN ${b.pan_id}`;
+  document.getElementById('kNodes').textContent = `${STATE.nodes.length} / ${b.router_count}R`;
+  document.getElementById('kRoles').textContent = `${STATE.nodes.filter(n => n.is_sleepy).length} SED · Part. ${b.partition_id}`;
+  document.getElementById('kDelivery').textContent = `${(STATE.ip_counters?.delivery_rate_pct ?? 100).toFixed(1)}%`;
+  document.getElementById('kMacSub').textContent = `MAC ACK ${(STATE.mac_counters?.ack_rate_pct ?? 100).toFixed(1)}% · TX ${STATE.mac_counters?.tx_total ?? 0}`;
+  document.getElementById('kMatter').textContent = `${mCount} liés`;
+  document.getElementById('kBat').textContent = minBat != null ? `Pile min 🔋 ${minBat}%` : '⚡ Secteur';
+
+  if (!SELECTED_EXT && STATE.nodes.length) SELECTED_EXT = STATE.nodes[0].ext_address;
+  renderDevices();
+  renderDashboard();
+  renderMap();
+  renderMapSidePanel();
+  renderSpectrum();
+  renderMatterAndGroups();
+  renderDevAndOta();
+  renderBrVault();
+  if (CURRENT_VIEW === 'join') renderJoinView();
+  if (CURRENT_VIEW === 'device-detail') renderDeviceDetail();
+}
+
+async function loadConfig() {
+  try {
+    const r = await apiFetch('api/config');
+    if (!r.ok) return;
+    CFG = await r.json();
+    if (!localStorage.getItem('t2m_theme') && CFG.default_theme === 'light') {
+      document.body.classList.add('light');
+      document.getElementById('btnTheme').textContent = '🌙';
+    }
+    const mb = document.getElementById('modeBadge');
+    if (CFG.can_commission) { mb.className = 'pill warn hide-sm'; mb.textContent = 'Join / Control Active'; }
+    else { mb.className = 'pill ok hide-sm'; mb.textContent = 'Read-Only (Prod)'; }
+    rebuildYamlGenerator();
+    if (CURRENT_VIEW === 'join') renderJoinView();
+    if (CURRENT_VIEW === 'device-detail') renderDeviceDetail();
+  } catch (_) {}
+}
+
+async function loadState() {
+  if (SANDBOX_MODE) return;
+  try {
+    const r = await apiFetch('api/state');
+    if (!r.ok) return;
+    STATE = await r.json();
+    if (STATE.events && !LOG_BUFFER.length) for (const e of [...STATE.events].reverse()) appendLog(e);
+    renderAll();
+  } catch (_) {
+    document.getElementById('sbDot').style.background = '#ef4444';
+  }
+}
+
+document.addEventListener('keydown', ev => {
+  if ((ev.ctrlKey || ev.metaKey) && ev.key.toLowerCase() === 'k') {
+    ev.preventDefault();
+    document.getElementById('globalSearch').focus();
+  }
+});
+
+function connectSse() {
+  if (SSE_CONN) { try { SSE_CONN.close(); } catch (_) {} }
+  SSE_CONN = new EventSource('api/events');
+  SSE_CONN.onmessage = ev => { try { appendLog(JSON.parse(ev.data)); } catch (_) {} };
+  SSE_CONN.onerror = () => { const d = document.getElementById('sseDot'); if (d) d.style.background = '#f59e0b'; };
+  SSE_CONN.onopen = () => { const d = document.getElementById('sseDot'); if (d) d.style.background = '#22c55e'; };
+}
+
+applySavedPrefs();
+document.getElementById('otctlBtns').innerHTML = OTCTL_CMDS.map(c => `<span class="chip" onclick="runOtctl('${c}')">${c}</span>`).join('');
+initMapEvents();
+const _initView = new URLSearchParams(location.search).get('view');
+if (_initView && document.getElementById('view-' + _initView)) navigate(_initView);
+loadConfig();
+loadState().then(() => { if (_initView && document.getElementById('view-' + _initView)) navigate(_initView); });
+setInterval(loadState, 8000);
+connectSse();
+</script>
+</body>
+</html>

@@ -1,0 +1,127 @@
+{
+  "uid": "thread2mqtt-mesh-overview",
+  "title": "Thread2MQTT — Thread & Matter Mesh Observability",
+  "description": "Ready-to-import Grafana dashboard for Thread2MQTT v0.4 native Prometheus /metrics",
+  "schemaVersion": 39,
+  "version": 1,
+  "refresh": "30s",
+  "tags": ["thread", "matter", "openthread", "iot", "thread2mqtt"],
+  "templating": {
+    "list": [
+      {
+        "name": "datasource",
+        "type": "datasource",
+        "query": "prometheus",
+        "label": "Prometheus"
+      }
+    ]
+  },
+  "panels": [
+    {
+      "id": 1,
+      "title": "Mesh Health Score",
+      "type": "gauge",
+      "gridPos": { "h": 6, "w": 6, "x": 0, "y": 0 },
+      "datasource": { "type": "prometheus", "uid": "${datasource}" },
+      "targets": [{ "expr": "thread2mqtt_mesh_health_score", "instant": true, "refId": "A" }],
+      "fieldConfig": {
+        "defaults": {
+          "unit": "percent",
+          "min": 0,
+          "max": 100,
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              { "color": "red", "value": null },
+              { "color": "orange", "value": 65 },
+              { "color": "green", "value": 85 }
+            ]
+          }
+        }
+      }
+    },
+    {
+      "id": 2,
+      "title": "Thread Nodes / Routers",
+      "type": "stat",
+      "gridPos": { "h": 6, "w": 6, "x": 6, "y": 0 },
+      "datasource": { "type": "prometheus", "uid": "${datasource}" },
+      "targets": [
+        { "expr": "thread2mqtt_mesh_nodes_total", "legendFormat": "Nodes", "instant": true, "refId": "A" },
+        { "expr": "thread2mqtt_router_count", "legendFormat": "Routers", "instant": true, "refId": "B" }
+      ]
+    },
+    {
+      "id": 3,
+      "title": "MAC ACK & IPv6 Delivery (%)",
+      "type": "stat",
+      "gridPos": { "h": 6, "w": 6, "x": 12, "y": 0 },
+      "datasource": { "type": "prometheus", "uid": "${datasource}" },
+      "targets": [
+        { "expr": "thread2mqtt_mac_ack_rate_percent", "legendFormat": "MAC ACK %", "instant": true, "refId": "A" },
+        { "expr": "thread2mqtt_ip_delivery_ratio", "legendFormat": "IPv6 Delivery %", "instant": true, "refId": "B" }
+      ],
+      "fieldConfig": { "defaults": { "unit": "percent" } }
+    },
+    {
+      "id": 4,
+      "title": "Active RF Channel & CCA Errors",
+      "type": "stat",
+      "gridPos": { "h": 6, "w": 6, "x": 18, "y": 0 },
+      "datasource": { "type": "prometheus", "uid": "${datasource}" },
+      "targets": [
+        { "expr": "thread2mqtt_channel", "legendFormat": "802.15.4 Channel", "instant": true, "refId": "A" },
+        { "expr": "thread2mqtt_mac_cca_errors_total", "legendFormat": "CCA Busy Errors", "instant": true, "refId": "B" }
+      ]
+    },
+    {
+      "id": 5,
+      "title": "Per-Node Thread RSSI (dBm)",
+      "type": "timeseries",
+      "gridPos": { "h": 8, "w": 12, "x": 0, "y": 6 },
+      "datasource": { "type": "prometheus", "uid": "${datasource}" },
+      "targets": [{ "expr": "thread2mqtt_node_rssi_dbm{role!=\"leader\"}", "legendFormat": "{{name}} ({{rloc16}})", "refId": "A" }],
+      "fieldConfig": { "defaults": { "unit": "dBm" } }
+    },
+    {
+      "id": 6,
+      "title": "Matter Sensor Battery Fleet (%)",
+      "type": "bargauge",
+      "gridPos": { "h": 8, "w": 12, "x": 12, "y": 6 },
+      "datasource": { "type": "prometheus", "uid": "${datasource}" },
+      "targets": [{ "expr": "thread2mqtt_node_battery_percent", "legendFormat": "{{name}}", "instant": true, "refId": "A" }],
+      "fieldConfig": {
+        "defaults": {
+          "unit": "percent",
+          "min": 0,
+          "max": 100,
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              { "color": "red", "value": null },
+              { "color": "orange", "value": 25 },
+              { "color": "green", "value": 50 }
+            ]
+          }
+        }
+      }
+    },
+    {
+      "id": 7,
+      "title": "SRP Lease Remaining (seconds)",
+      "type": "timeseries",
+      "gridPos": { "h": 7, "w": 12, "x": 0, "y": 14 },
+      "datasource": { "type": "prometheus", "uid": "${datasource}" },
+      "targets": [{ "expr": "thread2mqtt_node_srp_lease_seconds", "legendFormat": "{{name}}", "refId": "A" }],
+      "fieldConfig": { "defaults": { "unit": "s" } }
+    },
+    {
+      "id": 8,
+      "title": "Matter L7 Node Availability (1=Online)",
+      "type": "stat",
+      "gridPos": { "h": 7, "w": 12, "x": 12, "y": 14 },
+      "datasource": { "type": "prometheus", "uid": "${datasource}" },
+      "targets": [{ "expr": "thread2mqtt_node_matter_available", "legendFormat": "{{name}}", "instant": true, "refId": "A" }]
+    }
+  ]
+}

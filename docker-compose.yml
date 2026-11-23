@@ -1,0 +1,32 @@
+services:
+  thread2mqtt:
+    build: .
+    container_name: thread2mqtt
+    restart: unless-stopped
+    read_only: true
+    security_opt:
+      - no-new-privileges:true
+    cap_drop:
+      - ALL
+    mem_limit: 32m
+    cpus: 0.25
+    pids_limit: 64
+    ports:
+      - "127.0.0.1:8099:8099"
+    volumes:
+      # Mount your Zigbee2MQTT-style data directory containing configuration.yaml & state.json
+      - ./data:/data
+    environment:
+      # Quick start: built-in 6-node demo mesh.
+      # For live hardware: copy configuration.yaml.example -> ./data/configuration.yaml and set THREAD2MQTT_DEMO=0
+      - THREAD2MQTT_DEMO=1
+      - THREAD2MQTT_BIND=0.0.0.0:8099
+      - THREAD2MQTT_DATA_DIR=/data
+      - THREAD2MQTT_POLL_SECS=15
+      # - THREAD2MQTT_READ_ONLY=true
+      # - THREAD2MQTT_ALLOW_COMMISSIONING=false
+      # - OTBR_REST_URL=http://127.0.0.1:8081
+      # - MATTER_WS_URL=ws://127.0.0.1:5580/ws
+      # - MQTT_HOST=127.0.0.1:1883
+      # - MQTT_BASE_TOPIC=thread2mqtt
+      # - HA_DISCOVERY_PREFIX=homeassistant

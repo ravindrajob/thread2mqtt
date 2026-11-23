@@ -1,0 +1,18 @@
+# Python
+__pycache__/
+*.py[cod]
+.venv/
+.pytest_cache/
+
+# Rust
+/target/
+
+# Secrets & runtime
+.env
+.env.*
+!.env.example
+*.local
+*.log
+*.db
+*.sqlite*
+data/
