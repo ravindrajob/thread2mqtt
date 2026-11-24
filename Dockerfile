@@ -2,9 +2,12 @@
 FROM rust:1.83-alpine AS builder
 WORKDIR /src
 COPY Cargo.toml ./
+COPY assets/logo.png ./assets/logo.png
+COPY assets/devices ./assets/devices
 COPY src ./src
-RUN cargo test --locked 2>/dev/null || cargo test && \
-    cargo build --release
+RUN cargo test && \
+    cargo build --release && \
+    strip target/release/thread2mqtt
 
 FROM alpine:3.21
 RUN adduser -D -u 1000 thread2mqtt

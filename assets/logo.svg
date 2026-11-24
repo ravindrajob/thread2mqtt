@@ -1,0 +1,48 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512" role="img" aria-label="Thread2MQTT Logo">
+  <defs>
+    <!-- Luminous modern electric mint-aqua gradient (bright, fresh, high-contrast with jet-black) -->
+    <linearGradient id="t2mBg" x1="12%" y1="4%" x2="88%" y2="96%">
+      <stop offset="0%" stop-color="#60F7D6"/>
+      <stop offset="52%" stop-color="#2CE5C2"/>
+      <stop offset="100%" stop-color="#14D1B7"/>
+    </linearGradient>
+    <linearGradient id="t2mRim" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" stop-color="#B8FFEE" stop-opacity="0.75"/>
+      <stop offset="100%" stop-color="#0BA38E" stop-opacity="0.35"/>
+    </linearGradient>
+    <!-- Exact circular clip for the official Thread badge emblem -->
+    <clipPath id="threadDisc">
+      <circle cx="256" cy="146" r="102"/>
+    </clipPath>
+  </defs>
+
+  <!-- Modern softly-rounded chamfered octagon badge -->
+  <path d="M164 22 H348 Q360 22 369 31 L481 143 Q490 152 490 164 V348 Q490 360 481 369 L369 481 Q360 490 348 490 H164 Q152 490 143 481 L31 369 Q22 360 22 348 V164 Q22 152 31 143 L143 31 Q152 22 164 22 Z"
+        fill="url(#t2mBg)" stroke="url(#t2mRim)" stroke-width="4"/>
+
+  <!-- Official Thread circular emblem (exact geometric proportions, jet-black disc + pure white ribbon) -->
+  <g clip-path="url(#threadDisc)">
+    <circle cx="256" cy="146" r="102" fill="#0B0F14"/>
+    <!-- Vertical stem rising from bottom of circle (rel_x: -0.02..+0.19, width 0.21*R) -->
+    <rect x="254" y="117" width="21.5" height="136" fill="#FFFFFF"/>
+    <!-- Upper-right solid white circular lobe (tangent to stem left x=254 & bar bottom y=138.7) -->
+    <circle cx="288.8" cy="103.9" r="34.8" fill="#FFFFFF"/>
+    <!-- Seamless lower-left quadrant junction fill -->
+    <rect x="254" y="103.9" width="34.8" height="34.8" fill="#FFFFFF"/>
+    <!-- Left horizontal bar + 180-degree U-hook (outer r=37.7, inner r=16.0, center 222.5,154.7) -->
+    <path d="M256 117 H222.5 A37.7 37.7 0 1 0 222.5 192.4 V170.7 A16.0 16.0 0 1 1 222.5 138.7 H256 Z" fill="#FFFFFF"/>
+  </g>
+
+  <!-- Twin bidirectional bridge arrows (↓ ↑) representing Thread <-> MQTT flow -->
+  <g fill="none" stroke="#0B0F14" stroke-width="18" stroke-linecap="round" stroke-linejoin="round">
+    <!-- Left arrow pointing down (Thread -> MQTT) -->
+    <line x1="228" y1="274" x2="228" y2="338"/>
+    <polyline points="207,320 228,342 249,320"/>
+    <!-- Right arrow pointing up (MQTT -> Thread) -->
+    <line x1="284" y1="342" x2="284" y2="278"/>
+    <polyline points="263,296 284,274 305,296"/>
+  </g>
+
+  <!-- Extra-bold geometric rounded MQTT wordmark -->
+  <text x="256" y="438" text-anchor="middle" fill="#0B0F14" font-family="system-ui, -apple-system, 'Segoe UI', Roboto, Arial, sans-serif" font-size="86" font-weight="900" letter-spacing="2.5">MQTT</text>
+</svg>

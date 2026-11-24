@@ -1,87 +1,87 @@
-# Thread2MQTT — Pure-Rust Thread & Matter Debugger + Home Assistant MQTT Bridge
+<p align="center">
+  <img src="assets/logo.png" alt="Thread2MQTT Logo" width="144" />
+</p>
 
-[![License: MIT](https://img.shields.io/badge/License-MIT-blue.svg)](LICENSE)
-[![Rust 2021 std-only](https://img.shields.io/badge/Rust-2021%20std--only-orange.svg)](https://www.rust-lang.org/)
-[![Zero Crates](https://img.shields.io/badge/Crates-0%20External%20Deps-brightgreen.svg)](Cargo.toml)
-[![Home Assistant](https://img.shields.io/badge/Home%20Assistant-MQTT%20Discovery-41BDF5.svg)](https://www.home-assistant.io/)
+<h1 align="center">Thread2MQTT</h1>
 
-**Zigbee2MQTT-style Web UI, mesh topology debugger, Home Assistant MQTT Auto-Discovery, and Prometheus exporter for Thread (OTBR) + Matter-over-Thread** — compiled as a single static Rust binary (`< 1 MB`, `< 1 MB` RAM, **0 external crates**, **0 web CDNs**).
+<p align="center">
+  <strong>Open-source Rust Thread &amp; Matter Debugger + Home Assistant MQTT Bridge</strong><br/>
+  Embedded Web UI · Animated Mesh Map · 2.4 GHz RF Spectrum · <code>&lt; 1 MB</code> RSS · <strong>0 external crates</strong> · <strong>0 CDNs</strong>
+</p>
 
-- **Architecture & live homelab write-up:** [blog.ravindra-job.fr](https://blog.ravindra-job.fr/iot/thread2mqtt-rust-equivalent-zigbee2mqtt-thread-matter-home-assistant/)
+<p align="center">
+  <a href="LICENSE"><img src="https://img.shields.io/badge/License-MIT-0f9d88.svg" alt="License: MIT" /></a>
+  <a href="https://www.rust-lang.org/"><img src="https://img.shields.io/badge/Rust-2021%20std--only-14b8a6.svg" alt="Rust 2021 std-only" /></a>
+  <a href="Cargo.toml"><img src="https://img.shields.io/badge/Crates-0%20External%20Deps-15803d.svg" alt="Zero Crates" /></a>
+  <a href="https://www.home-assistant.io/"><img src="https://img.shields.io/badge/Home%20Assistant-MQTT%20Discovery-41BDF5.svg" alt="Home Assistant MQTT Discovery" /></a>
+</p>
+
+- **Technical write-up & bench:** [blog.ravindra-job.fr/iot/thread2mqtt-rust-equivalent-zigbee2mqtt-thread-matter-home-assistant/](https://blog.ravindra-job.fr/iot/thread2mqtt-rust-equivalent-zigbee2mqtt-thread-matter-home-assistant/) · **Architecture & IPv6/Backup Guide:** [`docs/GUIDE.md`](docs/GUIDE.md) · **Changelog:** [`CHANGELOG.md`](CHANGELOG.md) · **Logo:** [`assets/logo.png`](assets/logo.png) / [`assets/logo.svg`](assets/logo.svg)
 
 ## Live Preview (`--demo` mode)
 
-![Thread2MQTT v0.5 — Zigbee2MQTT-order Devices Table & Simple Mode](assets/demo_devices.webp)
+![Thread2MQTT Animated Thread Mesh Topology](assets/demo_mesh_anim.gif)
 
-| Interactive Mesh Map (Advanced Mode) | Permit Join, QR Camera & Server BLE Check |
+![Thread2MQTT Devices Table with Last Seen, RSSI and Matter Status](assets/demo_devices.webp)
+
+| Device Details (Exposes, Firmware, IPv6 OMR & Last Seen) | 2.4 GHz RF Spectrum Analyzer (Wi-Fi 1/6/11 + MAC/IPv6) |
 | :---: | :---: |
-| ![Interactive Thread Mesh Map](assets/demo_map.webp) | ![Permit Join, QR Scanner and Bluetooth Check](assets/demo_join.webp) |
+| ![Thread2MQTT Device Details View](assets/demo_device.webp) | ![Thread2MQTT 2.4 GHz Radio & RF Spectrum Analyzer](assets/demo_radio.webp) |
+
+| Home Overview & Recent Activity | Commissioning, Native QR Camera & Server BLE Check |
+| :---: | :---: |
+| ![Thread2MQTT Home Overview](assets/demo_home.webp) | ![Commissioning, QR Scanner and Bluetooth Check](assets/demo_join.webp) |
 
 ## Why Thread2MQTT?
 
-Home Assistant + `python-matter-server` controls Matter Layer 7, but exposes **zero Thread radio visibility** (no mesh map, no RSSI history, no 2.4 GHz spectrum, no MAC/IPv6 drop counters, no SRP leases).
+Home Assistant + `python-matter-server` controls Matter Layer 7, but exposes **no Thread radio visibility** (no mesh map, no RSSI history, no Last Seen, no 2.4 GHz spectrum, no MAC/IPv6 drop counters, no SRP leases).
 
 **Thread2MQTT runs as a non-blocking sidecar (`0 ms` added latency)** querying OTBR (`REST` + `ot-ctl`) and `python-matter-server` (`:5580/ws`) in parallel:
 
 ![Thread2MQTT Non-Blocking Sidecar Architecture](assets/architecture.webp)
 
-| Capability | Zigbee2MQTT | `python-matter-server` | **Thread2MQTT v0.5 (Rust)** |
-| :--- | :---: | :---: | :---: |
-| Familiar Z2M Menu + Simple / Advanced Toggle | Yes | No | **Yes (1-click)** |
-| Interactive Mesh Map + 60-pt RSSI Sparklines | Static | No | **Animated SVG + Heatmap** |
-| Thread L2/L3 (SRP) ↔ Matter L7 Correlation | N/A | No | **Automatic** |
-| Permit Join + Native QR Camera + Server BLE Detect | Yes | Basic UI | **Built-in (`configuration.yaml`)** |
-| 2.4 GHz Energy Scan + MAC/IPv6 Counters | Basic | No | **Built-in (Advanced Mode)** |
-| Prometheus `/metrics` + Grafana + Alert Rules | External | No | **Built-in (`monitoring/`)** |
-| Runtime Footprint | `~140 MB` (Node) | `~100 MB` (Python) | **`< 1 MB` RSS (`0` crates)** |
+| Capability | `python-matter-server` | **Thread2MQTT v0.5 (Rust)** |
+| :--- | :---: | :---: |
+| Web UI with Device Inspector, `Permit join`, `Columns:` & live `Last Seen` | Basic | **Built-in (0 CDN)** |
+| Animated Mesh Map + 60-pt RSSI Sparklines + Heatmap | No | **Built-in SVG** |
+| Automatic Thread L2/L3 (SRP) to Matter L7 Correlation + 22+ CSA Clusters | Partial | **Automatic (0 converters)** |
+| Commissioning + Native QR Camera + Host BLE/USB Detection | Basic UI | **Built-in (`configuration.yaml`)** |
+| 2.4 GHz RF Energy Scan + MAC/IPv6 Counters + Read-only `ot-ctl` | No | **Built-in** |
+| Prometheus `/metrics` + Grafana Dashboard + Alert Rules | No | **Built-in (`monitoring/`)** |
+| Runtime Footprint | `~30-100 MB` (Python) | **`984 KB` RSS (`0` crates)** |
 
 ## Quick Start
 
-### 1. Instant Demo (Zero Hardware)
+### Option 1 - Prebuilt Multi-Arch Docker Image (`amd64` + `arm64`)
 
 ```bash
-git clone https://github.com/ravindrajob/thread2mqtt.git
-cd thread2mqtt
-cargo test
-cargo run -- --demo --bind 127.0.0.1:8099
-# Web UI: http://127.0.0.1:8099/
-```
+# Instant zero-hardware demo:
+docker run --rm -p 127.0.0.1:8099:8099 ghcr.io/ravindrajob/thread2mqtt:latest --demo --bind 0.0.0.0:8099
 
-### 2. Production (`configuration.yaml`)
-
-```bash
+# Production with configuration.yaml (pull GHCR or add `--build` to rebuild locally):
 cp configuration.yaml.example data/configuration.yaml
-# Edit OTBR REST URL, Matter WS URL, and optional MQTT broker
 docker compose up -d
 ```
 
-Open **Settings → Detect local hardware** (`GET /api/hardware/scan`) to inspect host Bluetooth adapters (`hci0`..`hciN`), USB Thread RCP serial paths, and generate the `matter-server` `--bluetooth-adapter` Compose snippet.
+### Option 2 - Build From Scratch (Pure Rust `std`, Zero Crates)
 
-### 3. Enable Commissioning & Controls (Opt-In)
-
-Thread2MQTT ships **fail-closed (`read_only_mode: true`)** so live networks can be audited with zero mutation risk. To enable joining, Multi-Admin sharing (ECW), and `Identify` / `OnOff` commands, explicitly set in `data/configuration.yaml`:
-
-```yaml
-matter:
-  ws_url: "ws://127.0.0.1:5580/ws"
-  allow_commissioning: true
-
-advanced:
-  read_only_mode: false
+```bash
+git clone https://github.com/ravindrajob/thread2mqtt.git && cd thread2mqtt
+cargo test
+cargo run --release -- --demo --bind 127.0.0.1:8099
 ```
 
-## Monitoring (`monitoring/`)
+Open **Settings -> Detect local hardware** (`GET /api/hardware/scan`) to inspect host Bluetooth adapters (`hci0`..`hciN`) and USB Thread RCP paths. Ships **fail-closed (`read_only_mode: true`)**; set `advanced.read_only_mode: false` and `matter.allow_commissioning: true` in `data/configuration.yaml` to opt in to commissioning and controls.
 
-- `GET /metrics` — Prometheus gauges (`thread2mqtt_mesh_health_score`, `thread2mqtt_node_rssi_dbm`, `thread2mqtt_node_battery_percent`, `thread2mqtt_mac_ack_rate_percent`, `thread2mqtt_ip_delivery_ratio`).
-- `GET /api/alerts` — JSON alerts for Home Assistant REST sensors.
-- Ready-to-import [`monitoring/grafana-dashboard.json`](monitoring/grafana-dashboard.json) & [`monitoring/prometheus-alerts.yml`](monitoring/prometheus-alerts.yml).
+## Engineering Notes
 
-## Security Defaults
+- **64-bit Matter IDs vs `f64`:** Real `python-matter-server` snapshots carry 64-bit `compressed_fabric_id` integers that lose precision in float-backed JSON parsers; solved with exact `JsonVal::Uint(u64)` in `src/matter_ws.rs`.
+- **Matter WS errors inside HTTP 200:** Commissioning and cluster calls return JSON `error_code` frames over an active WebSocket; `write_matter_reply` translates them to HTTP `502`.
+- **Zero-crate constraint:** RFC 6455 WS, RFC 8259 JSON, Base38/Verhoeff (Matter Spec 5.1.4.1), and MQTT 3.1.1 are implemented directly on `std`, keeping the static binary near `1 MB` and live RSS under `1 MB`.
+- **Workflow:** Built and bench-tested against live `otbr-agent` + `python-matter-server` hardware (`14/14` unit tests). Full history in [`CHANGELOG.md`](CHANGELOG.md).
 
-- **0 external crates** (custom YAML, RFC 6455 WS, RFC 8259 JSON, Base38/Verhoeff Matter decoder, MQTT 3.1.1 in pure `std`) → zero third-party supply-chain CVEs.
-- **Secret masking:** `networkKey` & `pskc` masked at ingestion and stripped before MQTT/log output.
-- **Hardened container:** `USER 1000:1000`, `read_only: true`, `cap_drop: [ALL]`, `no-new-privileges:true`, `mem_limit: 32m`, optional `frontend.auth_token`.
+## Monitoring, CI/Releases & License
 
-## Contributing & License
-
-See [`CONTRIBUTING.md`](CONTRIBUTING.md) and [`AGENTS.md`](AGENTS.md). Independent project inspired by Zigbee2MQTT/WindFront ergonomics (not affiliated). Licensed under [MIT](LICENSE) — **Ravindra JOB**.
+- `GET /metrics` (Prometheus), `GET /api/alerts`, [`monitoring/grafana-dashboard.json`](monitoring/grafana-dashboard.json), [`monitoring/prometheus-alerts.yml`](monitoring/prometheus-alerts.yml), multi-arch CI/Release [`.github/workflows/ci-release.yml`](.github/workflows/ci-release.yml).
+- Secret masking on `networkKey` & `pskc`, hardened container (`USER 1000:1000`, `read_only: true`, `cap_drop: [ALL]`, `mem_limit: 32m`).
+- See [`CONTRIBUTING.md`](CONTRIBUTING.md) and [`AGENTS.md`](AGENTS.md). Licensed under [MIT](LICENSE) - **Ravindra JOB**.

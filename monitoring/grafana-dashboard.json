@@ -1,7 +1,7 @@
 {
   "uid": "thread2mqtt-mesh-overview",
-  "title": "Thread2MQTT — Thread & Matter Mesh Observability",
-  "description": "Ready-to-import Grafana dashboard for Thread2MQTT v0.4 native Prometheus /metrics",
+  "title": "Thread2MQTT - Thread & Matter Mesh Observability",
+  "description": "Ready-to-import Grafana dashboard for Thread2MQTT v0.5 native Prometheus /metrics",
   "schemaVersion": 39,
   "version": 1,
   "refresh": "30s",

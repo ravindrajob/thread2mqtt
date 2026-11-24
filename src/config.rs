@@ -1,5 +1,4 @@
-//! Pure-Rust zero-dependency `configuration.yaml` loader & sanitized serializer
-//! modeled after Zigbee2MQTT's `data/configuration.yaml` experience.
+//! Pure-Rust zero-dependency `configuration.yaml` loader & sanitized serializer.
 //!
 //! Loading precedence (lowest -> highest):
 //!   1. Safe fail-closed defaults (`read_only_mode: true`, `allow_commissioning: false`)
@@ -39,6 +38,9 @@ pub struct AppConfig {
     pub mqtt_base_topic: String,
     pub ha_discovery_enabled: bool,
     pub ha_discovery_prefix: String,
+    pub ha_url: Option<String>,
+    pub ha_token: Option<String>,
+    pub ha_allow_rename: bool,
     pub poll_secs: u64,
     pub rssi_history_points: usize,
     pub yaml_devices: BTreeMap<String, NodeMeta>,
@@ -50,8 +52,8 @@ impl Default for AppConfig {
             config_path: None,
             bind_addr: "127.0.0.1:8099".to_string(),
             auth_token: None,
-            default_theme: "dark".to_string(),
-            device_images_base_url: None,
+            default_theme: "light".to_string(),
+            device_images_base_url: Some("device-images".to_string()),
             demo_mode: false,
             read_only_mode: true, // Fail-closed master safety lock
             otbr_url: None,
@@ -69,6 +71,9 @@ impl Default for AppConfig {
             mqtt_base_topic: "thread2mqtt".to_string(),
             ha_discovery_enabled: true,
             ha_discovery_prefix: "homeassistant".to_string(),
+            ha_url: None,
+            ha_token: None,
+            ha_allow_rename: false,
             poll_secs: 15,
             rssi_history_points: 60,
             yaml_devices: BTreeMap::new(),
@@ -145,7 +150,7 @@ fn parse_bool(raw: &str) -> Option<bool> {
     }
 }
 
-/// Parses a Zigbee2MQTT-style `configuration.yaml` into an `AppConfig`.
+/// Parses a `configuration.yaml` file into an `AppConfig`.
 pub fn parse_yaml_config(yaml: &str, cfg: &mut AppConfig) {
     let mut section = String::new();
     let mut current_device: Option<String> = None;
@@ -190,6 +195,7 @@ pub fn parse_yaml_config(yaml: &str, cfg: &mut AppConfig) {
                     "group" | "room" => entry.group = Some(v),
                     "description" => entry.description = Some(v),
                     "icon" | "image" => entry.icon = Some(v),
+                    "pairing_code" => entry.pairing_code = Some(v),
                     _ => {}
                 }
             }
@@ -263,6 +269,13 @@ pub fn parse_yaml_config(yaml: &str, cfg: &mut AppConfig) {
             ("mqtt", "discovery_prefix") => {
                 if let Some(p) = opt_non_empty {
                     cfg.ha_discovery_prefix = p;
+                }
+            }
+            ("homeassistant", "url") => cfg.ha_url = opt_non_empty,
+            ("homeassistant", "token") => cfg.ha_token = opt_non_empty,
+            ("homeassistant", "allow_rename") => {
+                if let Some(b) = parse_bool(&v) {
+                    cfg.ha_allow_rename = b;
                 }
             }
             ("advanced", "read_only_mode") => {
@@ -413,6 +426,21 @@ impl AppConfig {
                 cfg.ha_discovery_prefix = v;
             }
         }
+        if let Ok(v) = env::var("HA_URL") {
+            if !v.trim().is_empty() {
+                cfg.ha_url = Some(v);
+            }
+        }
+        if let Ok(v) = env::var("HA_TOKEN") {
+            if !v.trim().is_empty() {
+                cfg.ha_token = Some(v);
+            }
+        }
+        if let Ok(v) = env::var("HA_ALLOW_RENAME") {
+            if let Some(b) = parse_bool(&v) {
+                cfg.ha_allow_rename = b;
+            }
+        }
         if let Ok(v) = env::var("THREAD2MQTT_POLL_SECS") {
             if let Ok(n) = v.parse::<u64>() {
                 cfg.poll_secs = n.clamp(5, 300);
@@ -448,7 +476,7 @@ impl AppConfig {
                 }
                 "--help" | "-h" => {
                     println!(
-                        "Thread2MQTT v{} — Rust Thread/OTBR/Matter to MQTT Bridge & Zigbee2MQTT-Style UI\n\
+                        "Thread2MQTT v{} — Open-source Rust Thread/OTBR/Matter to MQTT Bridge & Embedded Web UI\n\
                          Usage: thread2mqtt [--config configuration.yaml] [--demo] [--bind 127.0.0.1:8099] [--otbr-url URL] [--matter-ws ws://HOST:5580/ws] [--mqtt-host HOST:1883]\n\
                          Safety: read_only_mode defaults to true. Enable commissioning explicitly in configuration.yaml.",
                         env!("CARGO_PKG_VERSION")
@@ -473,6 +501,13 @@ impl AppConfig {
 
     pub fn can_interview(&self) -> bool {
         !self.read_only_mode && self.allow_interview
+    }
+
+    pub fn can_sync_ha_rename(&self) -> bool {
+        !self.read_only_mode
+            && self.ha_allow_rename
+            && self.ha_url.is_some()
+            && self.ha_token.is_some()
     }
 
     /// Renders a clean, secret-free `configuration.yaml` representation for the Web UI & downloads.
@@ -537,6 +572,17 @@ impl AppConfig {
             "  discovery_prefix: \"{}\"\n",
             self.ha_discovery_prefix
         ));
+        out.push_str("\nhomeassistant:\n");
+        out.push_str(&format!(
+            "  url: \"{}\"\n",
+            self.ha_url.as_deref().unwrap_or("")
+        ));
+        if self.ha_token.is_some() {
+            out.push_str("  token: \"********\"\n");
+        } else {
+            out.push_str("  # token: \"${HA_TOKEN}\"   # Optional Long-Lived Access Token for HA rename sync\n");
+        }
+        out.push_str(&format!("  allow_rename: {}\n", self.ha_allow_rename));
         out.push_str("\nadvanced:\n");
         out.push_str(&format!("  read_only_mode: {}\n", self.read_only_mode));
         out.push_str(&format!("  demo_mode: {}\n", self.demo_mode));
@@ -551,9 +597,34 @@ impl AppConfig {
         out
     }
 
+    pub fn has_local_device_images(&self) -> bool {
+        let Some(dir) = self.data_dir.as_deref() else {
+            return false;
+        };
+        let img_dir = Path::new(dir).join("device_images");
+        fs::read_dir(img_dir)
+            .ok()
+            .map(|mut rd| {
+                rd.any(|e| {
+                    e.ok()
+                        .and_then(|de| de.file_name().into_string().ok())
+                        .map(|n| {
+                            let low = n.to_ascii_lowercase();
+                            low.ends_with(".png")
+                                || low.ends_with(".webp")
+                                || low.ends_with(".jpg")
+                                || low.ends_with(".jpeg")
+                                || low.ends_with(".svg")
+                        })
+                        .unwrap_or(false)
+                })
+            })
+            .unwrap_or(false)
+    }
+
     pub fn to_public_json(&self) -> String {
         format!(
-            "{{\"version\":{},\"config_path\":{},\"read_only_mode\":{},\"can_commission\":{},\"can_interview\":{},\"allow_commissioning\":{},\"allow_interview\":{},\"allow_ota_check\":{},\"matter_configured\":{},\"otctl_configured\":{},\"mqtt_enabled\":{},\"ha_discovery_enabled\":{},\"auth_required\":{},\"default_theme\":{},\"device_images_base_url\":{},\"poll_secs\":{},\"zigbee_channel\":{},\"mqtt_base_topic\":{},\"ha_discovery_prefix\":{},\"sanitized_yaml\":{}}}",
+            "{{\"version\":{},\"config_path\":{},\"read_only_mode\":{},\"can_commission\":{},\"can_interview\":{},\"allow_commissioning\":{},\"allow_interview\":{},\"allow_ota_check\":{},\"matter_configured\":{},\"otctl_configured\":{},\"mqtt_enabled\":{},\"ha_discovery_enabled\":{},\"ha_configured\":{},\"ha_allow_rename\":{},\"can_sync_ha_rename\":{},\"auth_required\":{},\"default_theme\":{},\"device_images_base_url\":{},\"has_local_device_images\":{},\"poll_secs\":{},\"zigbee_channel\":{},\"mqtt_base_topic\":{},\"ha_discovery_prefix\":{},\"sanitized_yaml\":{}}}",
             json_str(env!("CARGO_PKG_VERSION")),
             self.config_path
                 .as_deref()
@@ -569,12 +640,16 @@ impl AppConfig {
             self.otctl_cmd.is_some(),
             self.mqtt_enabled,
             self.ha_discovery_enabled,
+            self.ha_url.is_some() && self.ha_token.is_some(),
+            self.ha_allow_rename,
+            self.can_sync_ha_rename(),
             self.auth_token.is_some(),
             json_str(&self.default_theme),
             self.device_images_base_url
                 .as_deref()
                 .map(json_str)
                 .unwrap_or_else(|| "null".to_string()),
+            self.has_local_device_images(),
             self.poll_secs,
             self.zigbee_channel
                 .map(|z| z.to_string())
@@ -654,11 +729,17 @@ devices:
     fn test_read_only_mode_overrides_allow_commissioning() {
         let mut cfg = AppConfig::default();
         parse_yaml_config(
-            "matter:\n  allow_commissioning: true\nadvanced:\n  read_only_mode: true\n",
+            "matter:\n  allow_commissioning: true\nhomeassistant:\n  url: \"http://127.0.0.1:8123\"\n  token: \"secret-ha-jwt\"\n  allow_rename: true\nadvanced:\n  read_only_mode: true\n",
             &mut cfg,
         );
         assert!(cfg.allow_commissioning);
         assert!(cfg.read_only_mode);
         assert!(!cfg.can_commission());
+        assert!(!cfg.can_sync_ha_rename());
+        let rendered = cfg.to_sanitized_yaml();
+        assert!(!rendered.contains("secret-ha-jwt"));
+        assert!(rendered.contains("token: \"********\""));
+        cfg.read_only_mode = false;
+        assert!(cfg.can_sync_ha_rename());
     }
 }

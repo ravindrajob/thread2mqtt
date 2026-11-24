@@ -1,14 +1,14 @@
 # ==============================================================================
-# Thread2MQTT — configuration.yaml (style Zigbee2MQTT)
+# Thread2MQTT — configuration.yaml
 # Copy to ./data/configuration.yaml or pass via `--config configuration.yaml`
 # Environment variables (OTBR_REST_URL, MATTER_WS_URL, MQTT_HOST, ...) override YAML.
 # ==============================================================================
 
 frontend:
   bind: "127.0.0.1:8099"       # Use "0.0.0.0:8099" inside Docker (publish on 127.0.0.1)
-  default_theme: "dark"        # dark | light
+  default_theme: "light"       # light (white + Thread teal) | dark
   # auth_token: "${THREAD2MQTT_AUTH_TOKEN}"  # Optional Bearer/Cookie token for LAN access
-  # device_images_base_url: "" # Optional community PNG base URL (empty = 100% local SVG + /data/device_images/)
+  device_images_base_url: "device-images" # Local <data_dir>/device_images/<vendor>_<model>.png (auto fallback SVG)
 
 thread:
   otbr_rest_url: "http://127.0.0.1:8081"
@@ -33,16 +33,21 @@ mqtt:
   homeassistant_discovery: true
   discovery_prefix: "homeassistant"
 
+homeassistant:
+  url: "http://127.0.0.1:8123"   # Loopback recommended (HA WS uses ws:// — avoid sending token over untrusted LAN)
+  # token: "${HA_TOKEN}"         # Optional Long-Lived Access Token (masked in UI/API)
+  allow_rename: false            # Set true (+ read_only_mode: false) to update HA device names
+
 advanced:
   read_only_mode: true         # Master safety lock (true = zero mutations on live production)
   demo_mode: false             # Set true for zero-hardware 6-node synthetic sandbox
-  data_dir: "/data"            # Persists friendly names, groups & notes (state.json)
+  data_dir: "/data"            # Persists friendly names, groups & notes (state.json, chmod 600)
   rssi_history_points: 60      # In-memory RSSI sparkline points per node
 
-# Optional static friendly names, rooms & device photos (just like Zigbee2MQTT devices:)
+# Optional static friendly names, rooms & device photos:
 devices:
   # "020000000000000c":
   #   friendly_name: "Hallway Smoke Detector"
   #   group: "Safety"
   #   description: "Upper floor hallway ceiling"
-  #   icon: "device_images/heiman_smoke.png"   # Local file under <data_dir>/device_images/ or https:// URL
+  #   icon: "heiman_smoke_sensor.webp"         # Local filename under <data_dir>/device_images/ (Zero-CDN)

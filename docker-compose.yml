@@ -1,5 +1,8 @@
 services:
   thread2mqtt:
+    # Option 1 (ready-to-run multi-arch): `docker compose up -d` pulls prebuilt GHCR image.
+    # Option 2 (rebuild from scratch):    `docker compose up -d --build` compiles Rust musl from Dockerfile.
+    image: ghcr.io/ravindrajob/thread2mqtt:latest
     build: .
     container_name: thread2mqtt
     restart: unless-stopped
@@ -8,13 +11,14 @@ services:
       - no-new-privileges:true
     cap_drop:
       - ALL
-    mem_limit: 32m
+    mem_limit: 64m
     cpus: 0.25
     pids_limit: 64
     ports:
       - "127.0.0.1:8099:8099"
     volumes:
-      # Mount your Zigbee2MQTT-style data directory containing configuration.yaml & state.json
+      # Mount your data directory containing configuration.yaml, state.json & device_images/
+      # First run: `mkdir -p ./data && chown 1000:1000 ./data` so non-root UID 1000 can persist state.json
       - ./data:/data
     environment:
       # Quick start: built-in 6-node demo mesh.

@@ -1,13 +1,17 @@
-//! Thread2MQTT Z2M-Plus Diagnostics, SRP Correlation, Matter Setup Code Decoder,
+//! Thread2MQTT Mesh & RF Diagnostics, SRP Correlation, Matter Setup Code Decoder,
 //! RF Coexistence Analyzer, Mesh Health Advisor & Persistent Node Metadata Store.
 //! 100% pure Rust `std` — zero external dependencies.
 
 use std::collections::BTreeMap;
 use std::fs;
 use std::path::Path;
+use std::sync::Mutex;
 
 use crate::matter_ws::parse_json;
-use crate::{json_escape, json_str, BorderRouterInfo, ThreadNode, ThreadRole};
+use crate::{
+    json_escape, json_str, sanitize_friendly_name, sanitize_pairing_code, BorderRouterInfo,
+    ThreadNode, ThreadRole,
+};
 
 // ============================================================================
 // 1. Whitelisted Read-Only `ot-ctl` Dev Console Commands (Zero Command Injection)
@@ -714,6 +718,22 @@ pub fn analyze_mesh_health(
         });
     }
 
+    // 5. Unmatched Thread nodes (visible on radio/SRP, absent from Matter L7 controller)
+    let unmatched_nodes: Vec<String> = nodes
+        .iter()
+        .filter(|n| n.role != ThreadRole::Leader && n.matter_node_id.is_none())
+        .map(|n| format!("{} ({})", n.friendly_name, n.rloc16))
+        .collect();
+    if !unmatched_nodes.is_empty() {
+        issues.push(HealthIssue {
+            severity: "warn".to_string(),
+            category: "UNMATCHED".to_string(),
+            title: format!("{} Thread Node(s) Not Linked to Matter L7", unmatched_nodes.len()),
+            detail: format!("Active on Thread radio without Matter correlation: {}.", unmatched_nodes.join(", ")),
+            recommendation: "Check if paired on another fabric (Apple Home / Google Home / Alexa) or verify python-matter-server WebSocket & mDNS visibility.".to_string(),
+        });
+    }
+
     if issues.iter().all(|i| i.severity == "ok") {
         issues.push(HealthIssue {
             severity: "ok".to_string(),
@@ -727,6 +747,54 @@ pub fn analyze_mesh_health(
     (global_score.clamp(0, 100) as u8, issues)
 }
 
+/// Checks non-root `/proc/net/ipv6_route` to verify whether the Linux host has an active route
+/// for the Border Router's IPv6 OMR prefix (e.g. `fdde:a138:6cc7:1::/64`).
+pub fn ipv6_omr_prefix_hex16(omr_prefix: &str) -> Option<String> {
+    let addr_part = omr_prefix.split('/').next()?.trim();
+    if addr_part.is_empty() || !addr_part.contains(':') {
+        return None;
+    }
+    let halves: Vec<&str> = addr_part.split("::").collect();
+    if halves.len() > 2 {
+        return None;
+    }
+    let left: Vec<u16> = if halves[0].is_empty() {
+        Vec::new()
+    } else {
+        halves[0].split(':').map(|g| u16::from_str_radix(g, 16).ok()).collect::<Option<Vec<_>>>()?
+    };
+    let right: Vec<u16> = if halves.len() == 2 && !halves[1].is_empty() {
+        halves[1].split(':').map(|g| u16::from_str_radix(g, 16).ok()).collect::<Option<Vec<_>>>()?
+    } else {
+        Vec::new()
+    };
+    if left.len() + right.len() > 8 {
+        return None;
+    }
+    let mut groups = [0u16; 8];
+    for (i, v) in left.iter().enumerate() {
+        groups[i] = *v;
+    }
+    let r_start = 8 - right.len();
+    for (i, v) in right.iter().enumerate() {
+        groups[r_start + i] = *v;
+    }
+    Some(format!("{:04x}{:04x}{:04x}{:04x}", groups[0], groups[1], groups[2], groups[3]))
+}
+
+pub fn check_ipv6_omr_route(omr_prefix: &str) -> Option<bool> {
+    let prefix_hex = ipv6_omr_prefix_hex16(omr_prefix)?;
+    let raw = fs::read_to_string("/proc/net/ipv6_route").ok()?;
+    for line in raw.lines() {
+        if let Some(dest) = line.split_whitespace().next() {
+            if dest.len() >= 16 && dest[..16].eq_ignore_ascii_case(&prefix_hex) {
+                return Some(true);
+            }
+        }
+    }
+    Some(false)
+}
+
 // ============================================================================
 // 7. Persistent JSON Node Metadata Store (Friendly Names, Groups, Descriptions)
 // ============================================================================
@@ -737,6 +805,7 @@ pub struct NodeMeta {
     pub group: Option<String>,
     pub description: Option<String>,
     pub icon: Option<String>,
+    pub pairing_code: Option<String>,
 }
 
 pub fn load_node_meta_store(data_dir: &str) -> BTreeMap<String, NodeMeta> {
@@ -749,41 +818,61 @@ pub fn load_node_meta_store(data_dir: &str) -> BTreeMap<String, NodeMeta> {
         return map;
     };
     if let Some(obj) = val.get("nodes").and_then(|v| v.as_obj()) {
-        for (ext, entry) in obj {
+        for (ext, entry) in obj.iter().take(512) {
+            let norm = ext.to_ascii_lowercase();
+            if norm.len() != 16 || !norm.chars().all(|c| c.is_ascii_hexdigit()) {
+                continue;
+            }
             let meta = NodeMeta {
-                friendly_name: entry.get("friendly_name").and_then(|v| v.as_str()).filter(|s| !s.is_empty()).map(|s| s.to_string()),
-                group: entry.get("group").and_then(|v| v.as_str()).filter(|s| !s.is_empty()).map(|s| s.to_string()),
-                description: entry.get("description").and_then(|v| v.as_str()).filter(|s| !s.is_empty()).map(|s| s.to_string()),
-                icon: entry.get("icon").and_then(|v| v.as_str()).filter(|s| !s.is_empty()).map(|s| s.to_string()),
+                friendly_name: entry.get("friendly_name").and_then(|v| v.as_str()).and_then(sanitize_friendly_name),
+                group: entry.get("group").and_then(|v| v.as_str()).and_then(sanitize_friendly_name),
+                description: entry.get("description").and_then(|v| v.as_str()).and_then(sanitize_friendly_name),
+                icon: entry.get("icon").and_then(|v| v.as_str()).map(|s| s.trim().to_string()).filter(|s| !s.is_empty() && s.len() <= 96 && !s.contains("..") && !s.contains("://")),
+                pairing_code: entry.get("pairing_code").and_then(|v| v.as_str()).and_then(sanitize_pairing_code),
             };
-            map.insert(ext.to_ascii_lowercase(), meta);
+            map.insert(norm, meta);
         }
     }
     map
 }
 
+static STATE_FILE_LOCK: Mutex<()> = Mutex::new(());
+
 pub fn save_node_meta_store(data_dir: &str, store: &BTreeMap<String, NodeMeta>) -> Result<(), String> {
+    use std::io::Write;
+    let _guard = STATE_FILE_LOCK.lock().map_err(|_| "state file lock poisoned".to_string())?;
     let dir = Path::new(data_dir);
     fs::create_dir_all(dir).map_err(|e| format!("create_dir_all {}: {}", data_dir, e))?;
     let mut entries = Vec::new();
-    for (ext, meta) in store {
+    for (ext, meta) in store.iter().take(512) {
         let fn_j = meta.friendly_name.as_deref().map(json_str).unwrap_or_else(|| "null".to_string());
         let gp_j = meta.group.as_deref().map(json_str).unwrap_or_else(|| "null".to_string());
         let ds_j = meta.description.as_deref().map(json_str).unwrap_or_else(|| "null".to_string());
         let ic_j = meta.icon.as_deref().map(json_str).unwrap_or_else(|| "null".to_string());
+        let pc_j = meta.pairing_code.as_deref().map(json_str).unwrap_or_else(|| "null".to_string());
         entries.push(format!(
-            "\"{}\":{{\"friendly_name\":{},\"group\":{},\"description\":{},\"icon\":{}}}",
+            "\"{}\":{{\"friendly_name\":{},\"group\":{},\"description\":{},\"icon\":{},\"pairing_code\":{}}}",
             json_escape(ext),
             fn_j,
             gp_j,
             ds_j,
-            ic_j
+            ic_j,
+            pc_j
         ));
     }
     let body = format!("{{\"version\":1,\"nodes\":{{{}}}}}", entries.join(","));
     let tmp = dir.join("state.json.tmp");
     let final_p = dir.join("state.json");
-    fs::write(&tmp, body).map_err(|e| format!("write tmp state: {}", e))?;
+    {
+        let mut f = fs::File::create(&tmp).map_err(|e| format!("create tmp state: {}", e))?;
+        #[cfg(unix)]
+        {
+            use std::os::unix::fs::PermissionsExt;
+            let _ = f.set_permissions(fs::Permissions::from_mode(0o600));
+        }
+        f.write_all(body.as_bytes()).map_err(|e| format!("write tmp state: {}", e))?;
+        let _ = f.sync_all();
+    }
     fs::rename(&tmp, &final_p).map_err(|e| format!("rename state.json: {}", e))?;
     Ok(())
 }
@@ -848,5 +937,12 @@ Done";
         assert!(!is_whitelisted_otctl("factoryreset"));
         assert!(!is_whitelisted_otctl("dataset active -x"));
         assert!(!is_whitelisted_otctl("state; rm -rf /"));
+    }
+
+    #[test]
+    fn test_ipv6_omr_prefix_normalization() {
+        assert_eq!(ipv6_omr_prefix_hex16("fdde:a138:6cc7:1::/64").as_deref(), Some("fddea1386cc70001"));
+        assert_eq!(ipv6_omr_prefix_hex16("fd00:db8:cafe:1::/64").as_deref(), Some("fd000db8cafe0001"));
+        assert_eq!(ipv6_omr_prefix_hex16(""), None);
     }
 }

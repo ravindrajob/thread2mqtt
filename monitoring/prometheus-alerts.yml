@@ -1,4 +1,4 @@
-# Prometheus Alerting Rules for Thread2MQTT v0.4
+# Prometheus Alerting Rules for Thread2MQTT v0.5
 # Validate with: promtool check rules monitoring/prometheus-alerts.yml
 groups:
   - name: thread2mqtt_mesh_health

@@ -35,7 +35,7 @@ def test_thread2mqtt_zero_trust_secrets_and_container_hardening():
     compose = (MODULE_DIR / "docker-compose.yml").read_text(encoding="utf-8")
     ui_html = (MODULE_DIR / "src/ui/index.html").read_text(encoding="utf-8")
 
-    # Zero-secret MQTT redaction, Z2M-Plus diagnostics & HA auto-discovery invariants
+    # Zero-secret MQTT redaction, mesh/RF diagnostics & HA auto-discovery invariants
     assert "pub fn sanitize_mqtt_payload(" in lib_rs
     assert "pub fn mask_secret_hex(" in lib_rs
     assert "pub fn correlate_srp_and_matter(" in lib_rs
@@ -77,3 +77,20 @@ def test_thread2mqtt_zero_trust_secrets_and_container_hardening():
     assert "discover_commissionable_nodes" not in readme
     assert "/api/permit-join" not in main_rs
     assert "allow_remove_node" not in main_rs and "allow_remove_node" not in ui_html
+    assert "pub fn ha_rename_matter_device(" in mws_rs
+    assert "pub fn matter_set_node_label(" in mws_rs
+    assert "_last_seen/config" in lib_rs and '"\\"pairing_code\\""' in lib_rs
+    assert "renameOverlay" in ui_html and "rnSyncHa" in ui_html
+
+    # Karpathy Multi-IA Council security & SRE hardening invariants (Fable 5.2 + Astra + AGY)
+    dockerfile = (MODULE_DIR / "Dockerfile").read_text(encoding="utf-8")
+    assert "COPY assets/devices ./assets/devices" in dockerfile
+    assert "strip target/release/thread2mqtt" in dockerfile
+    assert "mem_limit: 64m" in compose
+    assert "pub fn tcp_connect_timeout(" in lib_rs and "tcp_connect_timeout(" in mws_rs
+    assert "has_pairing_code" in lib_rs and "has_pairing_code" in ui_html
+    assert "MAX_HTTP_THREADS" in main_rs and "MAX_SSE_CONNS" in main_rs
+    assert "Content-Security-Policy:" in main_rs
+    assert "/api/pairing-code/reveal" in main_rs and "api/pairing-code/reveal" in ui_html
+    assert "STATE_FILE_LOCK" in diag_rs and "sync_all()" in diag_rs
+    assert "quickRename('${esc(n.ext_address)}','${esc(n.friendly_name)}')" not in ui_html

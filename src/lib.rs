@@ -5,8 +5,24 @@
 
 use std::collections::BTreeMap;
 use std::io::{Read, Write};
-use std::net::TcpStream;
+use std::net::{TcpStream, ToSocketAddrs};
 use std::time::{Duration, SystemTime, UNIX_EPOCH};
+
+/// Bounded TCP connect helper (prevents 60-127s OS SYN hangs freezing the poller on unreachable LAN hosts).
+pub fn tcp_connect_timeout(host_port: &str, timeout_ms: u64) -> Result<TcpStream, String> {
+    let dur = Duration::from_millis(timeout_ms.max(250));
+    let mut last_err = String::from("no resolved address");
+    let addrs = host_port
+        .to_socket_addrs()
+        .map_err(|e| format!("DNS/addr resolve {} KO: {}", host_port, e))?;
+    for addr in addrs {
+        match TcpStream::connect_timeout(&addr, dur) {
+            Ok(s) => return Ok(s),
+            Err(e) => last_err = e.to_string(),
+        }
+    }
+    Err(format!("TCP connect {} KO: {}", host_port, last_err))
+}
 
 pub mod config;
 pub mod diagnostics;
@@ -100,26 +116,48 @@ pub fn mask_secret_hex(raw: &str) -> String {
     format!("****...{}", &clean[clean.len() - 4..])
 }
 
-/// Zero-Trust invariant: guarantees sensitive Thread cryptographic keys never leak into MQTT.
+/// Zero-Trust invariant: guarantees sensitive Thread cryptographic keys & pairing codes never leak into MQTT or public exports.
 pub fn sanitize_mqtt_payload(payload: &str) -> String {
     let mut out = payload.to_string();
-    for secret_key in ["\"networkKey\"", "\"network_key\"", "\"pskc\"", "\"PSKc\""] {
+    for secret_key in ["\"networkKey\"", "\"network_key\"", "\"pskc\"", "\"PSKc\"", "\"pairing_code\""] {
         let mut cursor = 0;
         while let Some(rel_pos) = out[cursor..].find(secret_key) {
             let pos = cursor + rel_pos;
             let after_key = pos + secret_key.len();
-            if let Some(colon) = out[after_key..].find(':') {
-                let val_start = after_key + colon + 1;
-                if let Some(q1) = out[val_start..].find('"') {
-                    let s1 = val_start + q1 + 1;
-                    if let Some(q2) = out[s1..].find('"') {
-                        out.replace_range(s1..s1 + q2, "REDACTED");
-                        cursor = s1 + "REDACTED".len() + 1;
-                        continue;
+            let ws_after_key = out[after_key..].len() - out[after_key..].trim_start().len();
+            let colon_pos = after_key + ws_after_key;
+            if !out[colon_pos..].starts_with(':') {
+                cursor = after_key;
+                continue;
+            }
+            let after_colon = colon_pos + 1;
+            let ws_after_colon = out[after_colon..].len() - out[after_colon..].trim_start().len();
+            let val_pos = after_colon + ws_after_colon;
+            // Only redact string values (starts with '"'); leave null/bool/number untouched so JSON stays valid.
+            if out[val_pos..].starts_with('"') {
+                let s1 = val_pos + 1;
+                let bytes = out.as_bytes();
+                let mut i = s1;
+                let mut escaped = false;
+                let mut end_q = None;
+                while i < bytes.len() {
+                    if escaped {
+                        escaped = false;
+                    } else if bytes[i] == b'\\' {
+                        escaped = true;
+                    } else if bytes[i] == b'"' {
+                        end_q = Some(i);
+                        break;
                     }
+                    i += 1;
+                }
+                if let Some(q2) = end_q {
+                    out.replace_range(s1..q2, "REDACTED");
+                    cursor = s1 + "REDACTED".len() + 1;
+                    continue;
                 }
             }
-            cursor = after_key;
+            cursor = after_colon;
         }
     }
     out
@@ -236,6 +274,7 @@ pub struct ThreadNode {
     pub lq_out: u8,
     pub path_cost: u8,
     pub age_sec: u32,
+    pub last_seen_epoch_s: Option<u64>,
     pub child_timeout_sec: u32,
     pub thread_version: u8,
     pub is_sleepy: bool,
@@ -260,6 +299,7 @@ pub struct ThreadNode {
     pub group: Option<String>,
     pub description: Option<String>,
     pub icon: Option<String>,
+    pub pairing_code: Option<String>,
     pub health_score: u8,
     pub rssi_history: Vec<i32>,
 }
@@ -278,6 +318,7 @@ impl Default for ThreadNode {
             lq_out: 0,
             path_cost: 0,
             age_sec: 0,
+            last_seen_epoch_s: None,
             child_timeout_sec: 0,
             thread_version: 4,
             is_sleepy: false,
@@ -302,6 +343,7 @@ impl Default for ThreadNode {
             group: None,
             description: None,
             icon: None,
+            pairing_code: None,
             health_score: 100,
             rssi_history: Vec::new(),
         }
@@ -327,6 +369,7 @@ impl ThreadNode {
     pub fn to_json(&self) -> String {
         let opt_s = |o: &Option<String>| o.as_deref().map(json_str).unwrap_or_else(|| "null".to_string());
         let opt_u = |o: Option<u32>| o.map(|v| v.to_string()).unwrap_or_else(|| "null".to_string());
+        let opt_u64 = |o: Option<u64>| o.map(|v| v.to_string()).unwrap_or_else(|| "null".to_string());
         let clusters_json = self.matter_clusters.iter().map(|c| json_str(c)).collect::<Vec<_>>().join(",");
         let exposes_json = self
             .exposes
@@ -366,7 +409,7 @@ impl ThreadNode {
             .collect::<Vec<_>>()
             .join(",");
         format!(
-            "{{\"rloc16\":{},\"ext_address\":{},\"friendly_name\":{},\"role\":{},\"parent_rloc16\":{},\"avg_rssi_dbm\":{},\"last_rssi_dbm\":{},\"lq_in\":{},\"lq_out\":{},\"path_cost\":{},\"age_sec\":{},\"child_timeout_sec\":{},\"thread_version\":{},\"is_sleepy\":{},\"signal_quality\":{},\"health_score\":{},\"ipv6_omr\":{},\"srp_service\":{},\"srp_lease_remaining_s\":{},\"icd_sii_ms\":{},\"matter_node_id\":{},\"matter_vendor\":{},\"matter_product\":{},\"matter_serial\":{},\"matter_sw_version\":{},\"matter_hw_version\":{},\"matter_available\":{},\"matter_state\":{},\"matter_clusters\":[{}],\"battery_pct\":{},\"battery_mv\":{},\"battery_type\":{},\"exposes\":[{}],\"fabrics\":[{}],\"group\":{},\"description\":{},\"icon\":{},\"rssi_history\":[{}]}}",
+            "{{\"rloc16\":{},\"ext_address\":{},\"friendly_name\":{},\"role\":{},\"parent_rloc16\":{},\"avg_rssi_dbm\":{},\"last_rssi_dbm\":{},\"lq_in\":{},\"lq_out\":{},\"path_cost\":{},\"age_sec\":{},\"last_seen_epoch_s\":{},\"child_timeout_sec\":{},\"thread_version\":{},\"is_sleepy\":{},\"signal_quality\":{},\"health_score\":{},\"ipv6_omr\":{},\"srp_service\":{},\"srp_lease_remaining_s\":{},\"icd_sii_ms\":{},\"matter_node_id\":{},\"matter_vendor\":{},\"matter_product\":{},\"matter_serial\":{},\"matter_sw_version\":{},\"matter_hw_version\":{},\"matter_available\":{},\"matter_state\":{},\"matter_clusters\":[{}],\"battery_pct\":{},\"battery_mv\":{},\"battery_type\":{},\"exposes\":[{}],\"fabrics\":[{}],\"group\":{},\"description\":{},\"icon\":{},\"has_pairing_code\":{},\"rssi_history\":[{}]}}",
             json_str(&self.rloc16),
             json_str(&self.ext_address),
             json_str(&self.friendly_name),
@@ -378,6 +421,7 @@ impl ThreadNode {
             self.lq_out,
             self.path_cost,
             self.age_sec,
+            opt_u64(self.last_seen_epoch_s),
             self.child_timeout_sec,
             self.thread_version,
             self.is_sleepy,
@@ -404,6 +448,7 @@ impl ThreadNode {
             opt_s(&self.group),
             opt_s(&self.description),
             opt_s(&self.icon),
+            self.pairing_code.is_some(),
             rssi_hist_j
         )
     }
@@ -469,6 +514,7 @@ pub struct MeshSnapshot {
     pub br: BorderRouterInfo,
     pub br_ipaddrs: Vec<String>,
     pub br_omr_prefix: String,
+    pub ipv6_omr_route_ok: Option<bool>,
     pub mac_counters: MacCounters,
     pub ip_counters: IpCounters,
     pub srp_services: Vec<SrpServiceRecord>,
@@ -509,8 +555,9 @@ impl MeshSnapshot {
         let scan_j = self.energy_scan.iter().map(|c| c.to_json()).collect::<Vec<_>>().join(",");
         let issues_j = self.health_issues.iter().map(|h| h.to_json()).collect::<Vec<_>>().join(",");
         let zch = self.zigbee_channel.map(|v| v.to_string()).unwrap_or_else(|| "null".to_string());
+        let omr_ok = self.ipv6_omr_route_ok.map(|v| if v { "true" } else { "false" }).unwrap_or("null");
         format!(
-            "{{\"updated_at_s\":{},\"demo_mode\":{},\"otbr_source\":{},\"mqtt_connected\":{},\"matter_connected\":{},\"matter_bluetooth_enabled\":{},\"matter_sdk_version\":{},\"matter_fabric_id\":{},\"zigbee_channel\":{},\"mesh_health_score\":{},\"br\":{{\"state\":{},\"network_name\":{},\"ext_pan_id\":{},\"pan_id\":{},\"channel\":{},\"rloc16\":{},\"ext_address\":{},\"rloc_address\":{},\"mesh_local_prefix\":{},\"partition_id\":{},\"leader_weight\":{},\"router_count\":{},\"srp_state\":{},\"br_state\":{},\"network_key_masked\":{},\"pskc_masked\":{},\"omr_prefix\":{},\"ipaddrs\":[{}]}},\"mac_counters\":{},\"ip_counters\":{},\"srp_services\":[{}],\"energy_scan\":[{}],\"health_issues\":[{}],\"nodes\":[{}],\"links\":[{}],\"events\":[{}]}}",
+            "{{\"updated_at_s\":{},\"demo_mode\":{},\"otbr_source\":{},\"mqtt_connected\":{},\"matter_connected\":{},\"matter_bluetooth_enabled\":{},\"matter_sdk_version\":{},\"matter_fabric_id\":{},\"zigbee_channel\":{},\"ipv6_omr_route_ok\":{},\"mesh_health_score\":{},\"br\":{{\"state\":{},\"network_name\":{},\"ext_pan_id\":{},\"pan_id\":{},\"channel\":{},\"rloc16\":{},\"ext_address\":{},\"rloc_address\":{},\"mesh_local_prefix\":{},\"partition_id\":{},\"leader_weight\":{},\"router_count\":{},\"srp_state\":{},\"br_state\":{},\"network_key_masked\":{},\"pskc_masked\":{},\"omr_prefix\":{},\"ipaddrs\":[{}]}},\"mac_counters\":{},\"ip_counters\":{},\"srp_services\":[{}],\"energy_scan\":[{}],\"health_issues\":[{}],\"nodes\":[{}],\"links\":[{}],\"events\":[{}]}}",
             self.updated_at_s,
             self.demo_mode,
             json_str(&self.otbr_source),
@@ -520,6 +567,7 @@ impl MeshSnapshot {
             json_str(&self.matter_sdk_version),
             json_str(&self.matter_fabric_id),
             zch,
+            omr_ok,
             self.mesh_health_score,
             json_str(&self.br.state),
             json_str(&self.br.network_name),
@@ -887,7 +935,8 @@ pub fn fetch_http_json(base_url: &str, path: &str, timeout_ms: u64) -> Result<St
     } else {
         format!("{}:80", host_port)
     };
-    let mut stream = TcpStream::connect(&addr).map_err(|e| format!("OTBR connect {} KO: {}", addr, e))?;
+    let mut stream = tcp_connect_timeout(&addr, timeout_ms)
+        .map_err(|e| format!("OTBR {}", e))?;
     let dur = Some(Duration::from_millis(timeout_ms));
     let _ = stream.set_read_timeout(dur);
     let _ = stream.set_write_timeout(dur);
@@ -1013,7 +1062,8 @@ impl MqttPublisher {
         password: Option<&str>,
         base_topic: &str,
     ) -> Result<Self, String> {
-        let mut stream = TcpStream::connect(addr).map_err(|e| format!("MQTT TCP {} KO: {}", addr, e))?;
+        let mut stream = tcp_connect_timeout(addr, 3000)
+            .map_err(|e| format!("MQTT {}", e))?;
         let _ = stream.set_read_timeout(Some(Duration::from_secs(3)));
         let _ = stream.set_write_timeout(Some(Duration::from_secs(3)));
         let will_topic = format!("{}/bridge/state", base_topic);
@@ -1145,6 +1195,18 @@ pub fn build_ha_discovery_payloads(
                 node_dev
             ),
         ));
+
+        // Last Seen (ISO-8601 timestamp in Home Assistant)
+        out.push((
+            format!("{}/sensor/thread2mqtt_{}_last_seen/config", dp, slug),
+            format!(
+                "{{\"name\":\"Thread Last Seen\",\"unique_id\":\"thread2mqtt_{}_last_seen\",\"state_topic\":{},\"value_template\":\"{{{{ as_datetime(value_json.last_seen_epoch_s).isoformat() if value_json.last_seen_epoch_s else none }}}}\",\"device_class\":\"timestamp\",\"icon\":\"mdi:clock-check-outline\",\"entity_category\":\"diagnostic\",\"availability_topic\":{},\"device\":{}}}",
+                slug,
+                json_str(&state_topic),
+                json_str(&avail),
+                node_dev
+            ),
+        ));
     }
     out
 }
@@ -1156,18 +1218,34 @@ pub fn sanitize_topic_slug(s: &str) -> String {
         .collect()
 }
 
-/// Validates and cleans a user-supplied friendly name (prevents XSS / control chars).
+/// Validates and cleans a user-supplied friendly name (prevents XSS / JS quote breakout / control chars).
 pub fn sanitize_friendly_name(raw: &str) -> Option<String> {
     let cleaned: String = raw
         .trim()
         .chars()
-        .filter(|c| !c.is_control() && *c != '<' && *c != '>' && *c != '"')
+        .filter(|c| !c.is_control() && !matches!(*c, '<' | '>' | '"' | '\'' | '\\' | '`'))
         .take(64)
         .collect();
     if cleaned.is_empty() {
         None
     } else {
         Some(cleaned)
+    }
+}
+
+/// Validates a local Matter setup code memo (QR `MT:...` or 11/21-digit manual code).
+pub fn sanitize_pairing_code(raw: &str) -> Option<String> {
+    let cleaned: String = raw
+        .trim()
+        .chars()
+        .filter(|c| c.is_ascii_alphanumeric() || matches!(c, ':' | '.' | '-' | '+' | '$' | ' '))
+        .take(64)
+        .collect();
+    let trimmed = cleaned.trim().to_string();
+    if trimmed.is_empty() {
+        None
+    } else {
+        Some(trimmed)
     }
 }
 
@@ -1285,6 +1363,19 @@ pub fn render_prometheus_metrics(snapshot: &MeshSnapshot) -> String {
             out.push_str(&format!("thread2mqtt_node_srp_lease_seconds{{{}}} {}\n", lbl, lease));
         }
     }
+    out.push_str("# HELP thread2mqtt_node_last_seen_timestamp_seconds Unix epoch timestamp of last Thread radio packet heard from node\n");
+    out.push_str("# TYPE thread2mqtt_node_last_seen_timestamp_seconds gauge\n");
+    for n in &snapshot.nodes {
+        if let Some(ts) = n.last_seen_epoch_s {
+            let lbl = format!(
+                "rloc16=\"{}\",ext_address=\"{}\",name=\"{}\"",
+                json_escape(&n.rloc16),
+                json_escape(&n.ext_address),
+                json_escape(&n.friendly_name)
+            );
+            out.push_str(&format!("thread2mqtt_node_last_seen_timestamp_seconds{{{}}} {}\n", lbl, ts));
+        }
+    }
     out
 }
 
@@ -1321,24 +1412,25 @@ pub fn build_demo_snapshot() -> MeshSnapshot {
         ThreadNode {
             rloc16: "0x6c00".to_string(),
             ext_address: "0200000000000001".to_string(),
-            friendly_name: "OTBR Leader (PoE EFR32MG26)".to_string(),
+            friendly_name: "SMLIGHT SLZB-MR4U (Border Router)".to_string(),
             role: ThreadRole::Leader,
             lq_in: 3,
             lq_out: 3,
             ipv6_omr: Some("fd00:db8:cafe:1::1".to_string()),
-            matter_vendor: Some("OpenThread".to_string()),
-            matter_product: Some("Border Router 1.4".to_string()),
-            matter_sw_version: Some("OTBR 2026.1".to_string()),
+            matter_vendor: Some("SMLIGHT".to_string()),
+            matter_product: Some("SLZB-MR4U PoE Thread RCP".to_string()),
+            matter_sw_version: Some("RCP 2.7.2.0 / OTBR".to_string()),
             matter_state: Some("Leader · SRP running".to_string()),
             matter_clusters: vec!["ThreadNetworkDiagnostics".to_string()],
             group: Some("Infrastructure".to_string()),
-            description: Some("Primary PoE Thread Border Router".to_string()),
+            description: Some("Dual-radio PoE Thread 1.4 Border Router (EFR32MG26)".to_string()),
+            icon: Some("smlight_slzb_mr4u.webp".to_string()),
             ..Default::default()
         },
         ThreadNode {
             rloc16: "0x1400".to_string(),
             ext_address: "0200000000000002".to_string(),
-            friendly_name: "Living Room Plug (Router)".to_string(),
+            friendly_name: "Eve Energy (Living Room)".to_string(),
             role: ThreadRole::Router,
             parent_rloc16: Some("0x6c00".to_string()),
             avg_rssi_dbm: -56,
@@ -1352,7 +1444,7 @@ pub fn build_demo_snapshot() -> MeshSnapshot {
             srp_lease_remaining_s: Some(5420),
             matter_node_id: Some(12),
             matter_vendor: Some("Eve Systems".to_string()),
-            matter_product: Some("Eve Energy Matter".to_string()),
+            matter_product: Some("Eve Energy (EU) Matter".to_string()),
             matter_serial: Some("DEMO-EVE-0012".to_string()),
             matter_sw_version: Some("3.2.1".to_string()),
             matter_hw_version: Some("1.0".to_string()),
@@ -1364,12 +1456,13 @@ pub fn build_demo_snapshot() -> MeshSnapshot {
             ],
             fabrics: demo_fabric.clone(),
             group: Some("Living Room".to_string()),
+            icon: Some("eve_energy.webp".to_string()),
             ..Default::default()
         },
         ThreadNode {
             rloc16: "0x2800".to_string(),
             ext_address: "0200000000000003".to_string(),
-            friendly_name: "Hallway Ceiling Bulb (Router)".to_string(),
+            friendly_name: "Nanoleaf Essentials A60 (Hallway)".to_string(),
             role: ThreadRole::Router,
             parent_rloc16: Some("0x6c00".to_string()),
             avg_rssi_dbm: -64,
@@ -1395,12 +1488,13 @@ pub fn build_demo_snapshot() -> MeshSnapshot {
             ],
             fabrics: vec![demo_fabric[0].clone()],
             group: Some("Hallway".to_string()),
+            icon: Some("nanoleaf_essentials_a60.webp".to_string()),
             ..Default::default()
         },
         ThreadNode {
             rloc16: "0x6c01".to_string(),
             ext_address: "0200000000000004".to_string(),
-            friendly_name: "Office Climate Sensor".to_string(),
+            friendly_name: "Aqara Climate W100 (Office)".to_string(),
             role: ThreadRole::Sed,
             parent_rloc16: Some("0x6c00".to_string()),
             avg_rssi_dbm: -69,
@@ -1433,12 +1527,13 @@ pub fn build_demo_snapshot() -> MeshSnapshot {
             ],
             fabrics: vec![demo_fabric[0].clone()],
             group: Some("Office".to_string()),
+            icon: Some("aqara_climate_w100.webp".to_string()),
             ..Default::default()
         },
         ThreadNode {
             rloc16: "0x1401".to_string(),
             ext_address: "0200000000000005".to_string(),
-            friendly_name: "Front Door Contact (SED)".to_string(),
+            friendly_name: "Aqara Door & Window P2 (Front Door)".to_string(),
             role: ThreadRole::Sed,
             parent_rloc16: Some("0x1400".to_string()),
             avg_rssi_dbm: -74,
@@ -1455,7 +1550,7 @@ pub fn build_demo_snapshot() -> MeshSnapshot {
             icd_sii_ms: Some(17000),
             matter_node_id: Some(21),
             matter_vendor: Some("Aqara".to_string()),
-            matter_product: Some("Door & Window P2".to_string()),
+            matter_product: Some("Door & Window Sensor P2".to_string()),
             matter_serial: Some("DEMO-AQ-0021".to_string()),
             matter_sw_version: Some("1.0.2".to_string()),
             matter_hw_version: Some("1.0".to_string()),
@@ -1470,12 +1565,13 @@ pub fn build_demo_snapshot() -> MeshSnapshot {
             ],
             fabrics: demo_fabric.clone(),
             group: Some("Security".to_string()),
+            icon: Some("aqara_door_window_p2.webp".to_string()),
             ..Default::default()
         },
         ThreadNode {
             rloc16: "0x2801".to_string(),
             ext_address: "0200000000000006".to_string(),
-            friendly_name: "Garden Shed Smoke & Motion".to_string(),
+            friendly_name: "HEIMAN Smoke Sensor HS1SA-M (Upstairs)".to_string(),
             role: ThreadRole::Sed,
             parent_rloc16: Some("0x2800".to_string()),
             avg_rssi_dbm: -86,
@@ -1491,27 +1587,34 @@ pub fn build_demo_snapshot() -> MeshSnapshot {
             srp_lease_remaining_s: Some(2890),
             icd_sii_ms: Some(17000),
             matter_node_id: Some(24),
-            matter_vendor: Some("Eve Systems".to_string()),
-            matter_product: Some("Eve Motion Matter".to_string()),
-            matter_serial: Some("DEMO-EVE-0024".to_string()),
-            matter_sw_version: Some("3.2.0".to_string()),
+            matter_vendor: Some("HEIMAN".to_string()),
+            matter_product: Some("Smoke Sensor HS1SA-M".to_string()),
+            matter_serial: Some("DEMO-HM-0024".to_string()),
+            matter_sw_version: Some("1.2.0".to_string()),
             matter_hw_version: Some("1.0".to_string()),
-            matter_state: Some("Clear · 142 lx · Bat 79%".to_string()),
-            matter_clusters: vec!["OccupancySensing".to_string(), "IlluminanceMeasurement".to_string(), "PowerSource".to_string()],
-            battery_pct: Some(79),
-            battery_mv: Some(2870),
-            battery_type: Some("AAA x2".to_string()),
+            matter_state: Some("Smoke: Clear · Bat 96%".to_string()),
+            matter_clusters: vec!["SmokeCoAlarm".to_string(), "PowerSource".to_string()],
+            battery_pct: Some(96),
+            battery_mv: Some(3000),
+            battery_type: Some("CR123A".to_string()),
             exposes: vec![
-                MatterExpose { name: "Occupancy".into(), property: "occupancy".into(), value: "Clear".into(), unit: "".into(), cluster: "0x0406 Occupancy".into(), access: "R".into() },
-                MatterExpose { name: "Battery".into(), property: "battery".into(), value: "79".into(), unit: "%".into(), cluster: "0x002F Power".into(), access: "R".into() },
+                MatterExpose { name: "Smoke State".into(), property: "smoke_state".into(), value: "Clear".into(), unit: "".into(), cluster: "0x005C SmokeCoAlarm".into(), access: "R".into() },
+                MatterExpose { name: "Battery".into(), property: "battery".into(), value: "96".into(), unit: "%".into(), cluster: "0x002F Power".into(), access: "R".into() },
             ],
             fabrics: vec![demo_fabric[0].clone()],
             group: Some("Security".to_string()),
+            icon: Some("heiman_smoke_sensor.webp".to_string()),
             ..Default::default()
         },
     ];
 
+    let demo_now = now_epoch_s();
     for (idx, n) in nodes.iter_mut().enumerate() {
+        n.last_seen_epoch_s = Some(if n.role == ThreadRole::Leader {
+            demo_now
+        } else {
+            demo_now.saturating_sub(n.age_sec as u64)
+        });
         n.health_score = compute_node_health_score(n);
         if n.role != ThreadRole::Leader && n.avg_rssi_dbm < 0 {
             let base = n.avg_rssi_dbm;
@@ -1583,6 +1686,7 @@ pub fn build_demo_snapshot() -> MeshSnapshot {
             "fe80::200:ff:fe00:1".to_string(),
         ],
         br_omr_prefix: "fd00:db8:cafe:1::/64".to_string(),
+        ipv6_omr_route_ok: Some(true),
         mac_counters,
         ip_counters,
         srp_services: nodes
@@ -1627,8 +1731,8 @@ pub fn build_demo_snapshot() -> MeshSnapshot {
     snap.push_event(
         "INFO",
         "MQTT",
-        "Home Assistant MQTT Auto-Discovery schemas ready (20 diagnostic entities)",
-        "{\"discovery_prefix\":\"homeassistant\",\"entities\":20}",
+        "Home Assistant MQTT Auto-Discovery schemas ready (26 diagnostic entities)",
+        "{\"discovery_prefix\":\"homeassistant\",\"entities\":26}",
     );
     snap
 }
@@ -1823,23 +1927,29 @@ Done
         );
         assert_eq!(conn[0], 0x10);
 
-        let leaky = r#"{"channel":25,"networkKey":"0011223344556677","pskc":"aabbccdd"}"#;
+        let leaky = r#"{"channel":25,"networkKey":"001122\"3344556677","pskc":"aabbccdd","pairing_code":"3497-011-2332"}"#;
         let pub_pkt = encode_mqtt_publish("thread2mqtt/bridge/info", leaky, true);
         assert_eq!(pub_pkt[0], 0x31); // PUBLISH + RETAIN
         let as_txt = String::from_utf8_lossy(&pub_pkt);
-        assert!(!as_txt.contains("0011223344556677"));
+        assert!(!as_txt.contains("001122"));
+        assert!(!as_txt.contains("3344556677"));
         assert!(!as_txt.contains("aabbccdd"));
+        assert!(!as_txt.contains("3497-011-2332"));
         assert!(as_txt.contains("REDACTED"));
+        // Null pairing_code must NOT corrupt adjacent keys
+        let null_safe = sanitize_mqtt_payload(r#"{"pairing_code":null,"icon":"eve_energy.webp"}"#);
+        assert_eq!(null_safe, r#"{"pairing_code":null,"icon":"eve_energy.webp"}"#);
     }
 
     #[test]
     fn test_ha_mqtt_auto_discovery_structure() {
         let snap = build_demo_snapshot();
         let payloads = build_ha_discovery_payloads("homeassistant", "thread2mqtt", &snap);
-        // 2 bridge entities + 3 diagnostic entities * 6 demo nodes = 20
-        assert_eq!(payloads.len(), 20);
+        // 2 bridge entities + 4 diagnostic entities (rssi, lqi, role, last_seen) * 6 demo nodes = 26
+        assert_eq!(payloads.len(), 26);
         assert!(payloads.iter().any(|(t, p)| t == "homeassistant/binary_sensor/thread2mqtt_bridge_state/config" && p.contains("connectivity")));
         assert!(payloads.iter().any(|(t, p)| t.ends_with("_rssi/config") && p.contains("signal_strength") && p.contains("via_device")));
+        assert!(payloads.iter().any(|(t, p)| t.ends_with("_last_seen/config") && p.contains("timestamp") && p.contains("last_seen_epoch_s")));
         for (_, p) in &payloads {
             assert!(!p.contains("networkKey"));
         }
@@ -1854,6 +1964,9 @@ Done
         assert!(prom.contains("thread2mqtt_mesh_nodes_total 6"));
         assert!(prom.contains("thread2mqtt_node_rssi_dbm{"));
         assert!(prom.contains("thread2mqtt_node_lqi_in{"));
+        assert!(prom.contains("thread2mqtt_node_last_seen_timestamp_seconds{"));
+        assert!(snap.nodes.iter().all(|n| n.last_seen_epoch_s.is_some()));
+        assert!(snap.to_json().contains("\"last_seen_epoch_s\":"));
 
         assert_eq!(
             sanitize_friendly_name("  <script>Office Sensor\"  \n"),
