@@ -2,7 +2,7 @@
 
 Iterative engineering log across real homelab Thread (OTBR) and `python-matter-server` testing.
 
-## v0.5.0 - Ergonomic Sidebar Layout, Simple/Advanced Mode, QR Camera & Hardware Scan (`971 KB` bin / `936 KB` RSS)
+## v0.5.0 - Ergonomic Sidebar Layout, Simple/Advanced Mode, QR Camera & Hardware Scan (`1.2 MB` bin / `~1.8 MB` RSS, 6 embedded WebP assets)
 - **Pedagogical UI tooltips (`ⓘ`), IPv6 OMR route check & `UNMATCHED` log filter:** Pure-CSS hover/focus tooltips on Thread/Matter concepts (RLOC16, IPv6 OMR, SRP, mDNS, Multi-Admin ECW, Dataset Vault), non-root `/proc/net/ipv6_route` OMR route verification badge on Dashboard & Devices, `UNMATCHED` correlation filter in live Logs, Zero-Trust CLI backup guide in Vault, and versioned [`docs/GUIDE.md`](docs/GUIDE.md) (Option A vs Option B, IPv6/mDNS, Multi-Admin Alexa/Google/Apple, Security & Backup).
 - Structured left navigation (`Home`, `Dashboard`, `Devices`, `Groups`, `Radio & RF`, `Matter L7`, `OTA`, `Commissioning`, `Network`, `Logs`, `Dev Console`, `Settings`) with **Simple / Advanced** mode toggle.
 - Added native browser `BarcodeDetector` QR camera scanner for `MT:...` Matter payloads with manual fallback.

@@ -6,7 +6,7 @@
 
 <p align="center">
   <strong>Open-source Rust Thread &amp; Matter Debugger + Home Assistant MQTT Bridge</strong><br/>
-  Embedded Web UI · Animated Mesh Map · 2.4 GHz RF Spectrum · <code>&lt; 1 MB</code> RSS · <strong>0 external crates</strong> · <strong>0 CDNs</strong>
+  Embedded Web UI · Animated Mesh Map · 2.4 GHz RF Spectrum · <code>~1.8 MB</code> RSS · <strong>0 external crates</strong> · <strong>0 CDNs</strong>
 </p>
 
 <p align="center">
@@ -48,7 +48,7 @@ Home Assistant + `python-matter-server` controls Matter Layer 7, but exposes **n
 | Commissioning + Native QR Camera + Host BLE/USB Detection | Basic UI | **Built-in (`configuration.yaml`)** |
 | 2.4 GHz RF Energy Scan + MAC/IPv6 Counters + Read-only `ot-ctl` | No | **Built-in** |
 | Prometheus `/metrics` + Grafana Dashboard + Alert Rules | No | **Built-in (`monitoring/`)** |
-| Runtime Footprint | `~30-100 MB` (Python) | **`984 KB` RSS (`0` crates)** |
+| Runtime Footprint | `~30-100 MB` (Python) | **`~1.8 MB` RSS (`1.2 MB` bin, `0` crates)** |
 
 ## Quick Start
 
@@ -77,11 +77,11 @@ Open **Settings -> Detect local hardware** (`GET /api/hardware/scan`) to inspect
 
 - **64-bit Matter IDs vs `f64`:** Real `python-matter-server` snapshots carry 64-bit `compressed_fabric_id` integers that lose precision in float-backed JSON parsers; solved with exact `JsonVal::Uint(u64)` in `src/matter_ws.rs`.
 - **Matter WS errors inside HTTP 200:** Commissioning and cluster calls return JSON `error_code` frames over an active WebSocket; `write_matter_reply` translates them to HTTP `502`.
-- **Zero-crate constraint:** RFC 6455 WS, RFC 8259 JSON, Base38/Verhoeff (Matter Spec 5.1.4.1), and MQTT 3.1.1 are implemented directly on `std`, keeping the static binary near `1 MB` and live RSS under `1 MB`.
-- **Workflow:** Built and bench-tested against live `otbr-agent` + `python-matter-server` hardware (`14/14` unit tests). Full history in [`CHANGELOG.md`](CHANGELOG.md).
+- **Zero-crate constraint:** RFC 6455 WS, RFC 8259 JSON, Base38/Verhoeff (Matter Spec 5.1.4.1), and MQTT 3.1.1 are implemented directly on `std`, keeping the static binary at `1.2 MB` (including 6 embedded WebP assets) and live RSS around `~1.8 MB`.
+- **Workflow:** Built and bench-tested against live `otbr-agent` + `python-matter-server` hardware (`16/16` unit tests). Full history in [`CHANGELOG.md`](CHANGELOG.md).
 
 ## Monitoring, CI/Releases & License
 
 - `GET /metrics` (Prometheus), `GET /api/alerts`, [`monitoring/grafana-dashboard.json`](monitoring/grafana-dashboard.json), [`monitoring/prometheus-alerts.yml`](monitoring/prometheus-alerts.yml), multi-arch CI/Release [`.github/workflows/ci-release.yml`](.github/workflows/ci-release.yml).
-- Secret masking on `networkKey` & `pskc`, hardened container (`USER 1000:1000`, `read_only: true`, `cap_drop: [ALL]`, `mem_limit: 32m`).
+- Secret masking on `networkKey` & `pskc`, hardened container (`USER 1000:1000`, `read_only: true`, `cap_drop: [ALL]`, `mem_limit: 64m`).
 - See [`CONTRIBUTING.md`](CONTRIBUTING.md) and [`AGENTS.md`](AGENTS.md). Licensed under [MIT](LICENSE) - **Ravindra JOB**.
